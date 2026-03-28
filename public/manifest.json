@@ -1,0 +1,10 @@
+{
+  "name": "MATCHMETER",
+  "short_name": "MATCHMETER",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2196f3",
+  "description": "Sports tournament management platform",
+  "icons": []
+}

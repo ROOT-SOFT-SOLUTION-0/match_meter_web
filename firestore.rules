@@ -1,0 +1,200 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function hasRole(role) {
+      return isSignedIn() && userDoc().data.role == role;
+    }
+
+    function isSuperAdmin() {
+      return hasRole('superadmin');
+    }
+
+    function isAdminOrSuperAdmin() {
+      return isSignedIn() &&
+        (userDoc().data.role == 'admin' || userDoc().data.role == 'superadmin');
+    }
+
+    function hasSuccessfulAdminUpgradePayment(userId) {
+      let paymentDocId = 'admin_upgrade_' + userId;
+      let paymentPath = /databases/$(database)/documents/payments/$(paymentDocId);
+      return exists(paymentPath) &&
+        get(paymentPath).data.user_id == userId &&
+        get(paymentPath).data.status == 'success' &&
+        get(paymentPath).data.upgrade_type == 'admin';
+    }
+
+    function canSelfUpgradeToAdmin(userId) {
+      return request.auth.uid == userId &&
+        resource.data.role == 'user' &&
+        request.resource.data.role == 'admin' &&
+        request.resource.data.is_premium == true &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'role',
+          'is_premium',
+          'updated_at',
+        ]) &&
+        hasSuccessfulAdminUpgradePayment(userId);
+    }
+
+    function hasTournamentCreationPayment(adminId, tournamentId) {
+      let paymentDocId = 'admin_create_' + adminId + '_' + tournamentId;
+      let paymentPath = /databases/$(database)/documents/payments/$(paymentDocId);
+      return exists(paymentPath) &&
+        get(paymentPath).data.user_id == adminId &&
+        get(paymentPath).data.tournament_id == tournamentId &&
+        get(paymentPath).data.status == 'success' &&
+        get(paymentPath).data.upgrade_type == 'admin_tournament_create';
+    }
+
+    function registrationDocBelongsToRequester(registrationId) {
+      return isSignedIn() && registrationId.matches('.*_' + request.auth.uid);
+    }
+
+    function paymentDocBelongsToRequester(paymentId) {
+      return isSignedIn() && (
+        paymentId == 'admin_upgrade_' + request.auth.uid ||
+        paymentId.matches('unlock_' + request.auth.uid + '_.*') ||
+        paymentId.matches('admin_create_' + request.auth.uid + '_.*')
+      );
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.id == userId &&
+        request.resource.data.role == 'user';
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        (
+          request.auth.uid == userId &&
+          request.resource.data.role == resource.data.role
+        ) ||
+        canSelfUpgradeToAdmin(userId)
+      );
+      allow delete: if false;
+    }
+
+    match /tournament_registrations/{registrationId} {
+      allow read: if isSignedIn() && (
+        registrationDocBelongsToRequester(registrationId) ||
+        resource.data.user_id == request.auth.uid ||
+        isAdminOrSuperAdmin()
+      );
+      allow create: if isSignedIn() &&
+        request.resource.data.user_id == request.auth.uid &&
+        request.resource.data.id == registrationId;
+      allow update: if isSignedIn() && (
+        resource.data.user_id == request.auth.uid ||
+        isAdminOrSuperAdmin()
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /tournaments/{tournamentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (
+        isSuperAdmin() ||
+        (
+          hasRole('admin') &&
+          request.resource.data.admin_id == request.auth.uid &&
+          request.resource.data.id == tournamentId &&
+          hasTournamentCreationPayment(request.auth.uid, tournamentId)
+        )
+      );
+      allow update: if isAdminOrSuperAdmin();
+      allow delete: if hasRole('superadmin');
+    }
+
+    match /matches/{matchId} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdminOrSuperAdmin();
+      allow delete: if hasRole('superadmin');
+    }
+
+    match /updates/{updateId} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdminOrSuperAdmin();
+      allow delete: if hasRole('superadmin');
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isSignedIn() && (
+        paymentDocBelongsToRequester(paymentId) ||
+        resource.data.user_id == request.auth.uid
+      );
+      allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /stream_requests/{requestId} {
+      allow read: if isSignedIn();
+      allow create: if isAdminOrSuperAdmin();
+      allow update: if isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /sponsors/{sponsorId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    // Tournament Bracket Rules
+    match /tournaments/{tournamentId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (
+        isSuperAdmin() ||
+        (
+          hasRole('admin') &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.id == tournamentId
+        )
+      );
+      allow update: if isAdminOrSuperAdmin() && (
+        resource.data.createdBy == request.auth.uid ||
+        isSuperAdmin()
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /tournament_configs/{configId} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdminOrSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /bracket_matches/{matchId} {
+      allow read: if isSignedIn();
+      allow create: if isAdminOrSuperAdmin();
+      allow update: if isAdminOrSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /bracket_teams/{teamId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAdminOrSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /tournament_stats/{statsId} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdminOrSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /registration_deadlines/{deadlineId} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdminOrSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+  }
+}
