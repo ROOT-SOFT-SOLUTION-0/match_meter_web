@@ -19,6 +19,21 @@ export function useAuth(): UseAuthReturn {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const mapAuthError = (err: unknown): string => {
+    const code = (err as any)?.code as string | undefined;
+
+    if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+      return 'Invalid credentials. Please check your email and password.';
+    }
+
+    if (code === 'auth/too-many-requests') {
+      return 'Too many failed attempts. Please try again later.';
+    }
+
+    const fallback = err instanceof Error ? err.message : 'Authentication failed';
+    return fallback || 'Authentication failed';
+  };
+
   // Subscribe to auth state changes
   useEffect(() => {
     const unsubscribe = authService.onAuthStateChange(async (currentUser) => {
@@ -60,9 +75,9 @@ export function useAuth(): UseAuthReturn {
     try {
       await authService.signIn(email, password);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Sign in failed';
+      const errorMessage = mapAuthError(err);
       setError(errorMessage);
-      throw err;
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -116,8 +131,15 @@ export function useAuth(): UseAuthReturn {
     setError(null);
     try {
       if (user?.uid) {
-        await authService.updateUserProfile(user.uid, userData);
-        setUser({ ...user, ...userData });
+        // Always include existing role so Firestore rules that
+        // require role to stay unchanged allow the update
+        const payload: Partial<User> = {
+          ...userData,
+          role: user.role,
+        };
+
+        await authService.updateUserProfile(user.uid, payload);
+        setUser({ ...user, ...payload });
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Profile update failed';
