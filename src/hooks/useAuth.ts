@@ -12,6 +12,7 @@ interface UseAuthReturn {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateProfile: (userData: Partial<User>) => Promise<void>;
+  upgradeToAdmin: () => Promise<void>;
 }
 
 export function useAuth(): UseAuthReturn {
@@ -150,6 +151,23 @@ export function useAuth(): UseAuthReturn {
     }
   };
 
+  const upgradeToAdmin = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await authService.upgradeToAdmin();
+      if (user) {
+        setUser({ ...user, role: 'admin', is_premium: true });
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Upgrade failed';
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     user,
     loading,
@@ -160,5 +178,6 @@ export function useAuth(): UseAuthReturn {
     signOut,
     resetPassword,
     updateProfile,
+    upgradeToAdmin,
   };
 }

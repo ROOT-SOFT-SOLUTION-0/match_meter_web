@@ -9,7 +9,7 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth';
 import { auth, googleProvider, db } from './firebase';
-import { doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
+import { collection, doc, getDocs, query, setDoc, getDoc, Timestamp, where, updateDoc } from 'firebase/firestore';
 import { User } from '../types/models';
 
 class AuthService {
@@ -189,6 +189,77 @@ class AuthService {
 
   getCurrentUser() {
     return auth.currentUser;
+  }
+
+  /**
+   * Upgrade the currently signed-in user to admin after successful payment.
+   * This writes a payment record with id `admin_upgrade_<uid>` and then
+   * updates the user document's role and premium flag.
+   */
+  async upgradeToAdmin(): Promise<void> {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('You must be signed in to upgrade.');
+    }
+
+    const uid = currentUser.uid;
+
+    // 1) Create/overwrite the admin upgrade payment document expected by rules
+    const paymentDocId = `admin_upgrade_${uid}`;
+    const paymentRef = doc(db, 'payments', paymentDocId);
+    await setDoc(paymentRef, {
+      user_id: uid,
+      amount: 199,
+      currency: 'INR',
+      status: 'success',
+      upgrade_type: 'admin',
+      created_at: Timestamp.now(),
+      updated_at: Timestamp.now(),
+    });
+
+    // 2) Update the user document to admin with premium flag
+    const userRef = doc(db, 'users', uid);
+    await updateDoc(userRef, {
+      role: 'admin',
+      is_premium: true,
+      updated_at: Timestamp.now(),
+    });
+  }
+
+  async findUserByPhone(phone: string): Promise<User | null> {
+    try {
+      const q = query(
+        collection(db, 'users'),
+        where('phone', '==', phone)
+      );
+
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return null;
+
+      const docSnap = snapshot.docs[0];
+      const data = docSnap.data();
+
+      return {
+        uid: docSnap.id,
+        email: data.email,
+        displayName: data.displayName,
+        photoURL: data.photoURL,
+        phone: data.phone,
+        city: data.city,
+        role: data.role || 'user',
+        createdAt: data.createdAt?.toMillis?.() || data.createdAt || Date.now(),
+        age: data.age,
+        place: data.place,
+        location: data.location,
+        aadharNumber: data.aadharNumber,
+        dateOfBirth: data.dateOfBirth,
+        sportsInterests: data.sportsInterests || [],
+        profileImage: data.profileImage,
+      } as User;
+    } catch (error) {
+      console.error('Error finding user by phone:', error);
+      return null;
+    }
   }
 
   onAuthStateChange(callback: (user: FirebaseUser | null) => void) {

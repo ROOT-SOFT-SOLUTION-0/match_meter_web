@@ -10,6 +10,9 @@ import backgroundSyncService from './services/background-sync.service';
 const HomePage = React.lazy(() => import('./pages/Home'));
 const LoginPage = React.lazy(() => import('./pages/Login'));
 const SignupPage = React.lazy(() => import('./pages/Signup'));
+const PlayerDashboardPage = React.lazy(() => import('./pages/PlayerDashboard'));
+const FeedPage = React.lazy(() => import('./pages/Feed'));
+const SettingsPage = React.lazy(() => import('./pages/Settings'));
 const TournamentsPage = React.lazy(() => import('./pages/Tournaments'));
 const TournamentDetailPage = React.lazy(() => import('./pages/TournamentDetail'));
 const MyTeamsPage = React.lazy(() => import('./pages/MyTeams'));
@@ -60,6 +63,30 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
+            <Route
+              path="/player"
+              element={
+                <ProtectedRoute>
+                  <PlayerDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/feed"
+              element={
+                <ProtectedRoute>
+                  <FeedPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute checkProfileCompletion={false}>
+                  <SettingsPage />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Protected routes */}
             <Route

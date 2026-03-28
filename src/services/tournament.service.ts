@@ -33,6 +33,7 @@ export class TournamentService {
       startDate: number;
       endDate: number;
       image?: string;
+      highlightVideoUrl?: string;
       rules?: string;
       schedule?: string;
       registrationDeadline: number;

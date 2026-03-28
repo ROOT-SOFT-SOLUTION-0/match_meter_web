@@ -89,28 +89,24 @@ export const TournamentManagement: React.FC = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Tournament Management</h1>
         <Button
-          onClick={() => setShowCreateForm(true)}
+          onClick={() => setShowCreateForm((prev) => !prev)}
         >
-          + Create Tournament
+          {showCreateForm ? 'Back to tournaments' : '+ Create Tournament'}
         </Button>
       </div>
 
-      {/* Create Form Modal */}
-      {showCreateForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="max-w-2xl w-full max-h-96 overflow-y-auto">
-            <CreateTournamentForm
-              onSuccess={() => {
-                loadTournaments();
-              }}
-              onClose={() => setShowCreateForm(false)}
-            />
-          </div>
+      {/* Either show create form or tournaments list */}
+      {showCreateForm ? (
+        <div className="mt-4">
+          <CreateTournamentForm
+            onSuccess={() => {
+              loadTournaments();
+              setShowCreateForm(false);
+            }}
+            onClose={() => setShowCreateForm(false)}
+          />
         </div>
-      )}
-
-      {/* Tournaments List */}
-      {tournaments.length === 0 ? (
+      ) : tournaments.length === 0 ? (
         <Card className="p-12 text-center">
           <p className="text-gray-500 text-lg">No tournaments yet.</p>
           <Button

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { MobileNavBar } from './MobileNavBar';
 import { useAuth } from '../../hooks';
 import { useUIStore } from '../../store';
 
@@ -48,10 +49,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {user && <Sidebar />}
 
       <main className={["flex-1 transition-all duration-300", mainOffset, mobileOffset].join(' ')}>
-        <div className="px-4 sm:px-6 lg:px-8 py-6">
+        <div className="px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-8">
           {children}
         </div>
       </main>
+      {user && <MobileNavBar />}
     </div>
   );
 };

@@ -8,6 +8,7 @@ export interface User {
   city?: string;
   role: 'user' | 'admin' | 'super_admin';
   createdAt: number;
+  is_premium?: boolean;
   // Profile Details
   age?: number;
   place?: string;
@@ -33,6 +34,8 @@ export interface Tournament {
   entryFee: number;
   currency: string;
   image?: string;
+  // Optional highlight / promo video for feed (YouTube Shorts, Drive, etc.)
+  highlightVideoUrl?: string;
   createdBy: string;
   createdAt: number;
   updatedAt: number;
@@ -72,6 +75,11 @@ export interface TeamRegistration {
   captainPhone: string;
   captainEmail: string;
   players: string[];
+  playersInfo?: Array<{
+    userId?: string;
+    name: string;
+    phone?: string;
+  }>;
   totalMembers: number;
   status: 'pending' | 'approved' | 'rejected';
   registeredAt: number;

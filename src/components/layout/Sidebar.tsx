@@ -16,6 +16,12 @@ interface SidebarItem {
 const navItems: SidebarItem[] = [
   {
     label: 'Dashboard',
+    path: '/player',
+    icon: <LayoutDashboard className="h-4 w-4" aria-hidden="true" />,
+    roles: ['user'],
+  },
+  {
+    label: 'Admin Dashboard',
     path: '/admin',
     icon: <LayoutDashboard className="h-4 w-4" aria-hidden="true" />,
     roles: ['admin', 'super_admin'],
@@ -36,6 +42,12 @@ const navItems: SidebarItem[] = [
     label: 'Profile',
     path: '/profile',
     icon: <UserCircle className="h-4 w-4" aria-hidden="true" />,
+    roles: ['user', 'admin', 'super_admin'],
+  },
+  {
+    label: 'Settings',
+    path: '/settings',
+    icon: <Settings2 className="h-4 w-4" aria-hidden="true" />,
     roles: ['user', 'admin', 'super_admin'],
   },
   {

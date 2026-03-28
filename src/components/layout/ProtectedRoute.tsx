@@ -23,17 +23,13 @@ const hasRequiredRole = (
 const getHomeRouteByRole = (role: 'user' | 'admin' | 'super_admin'): string => {
   if (role === 'super_admin') return '/super-admin';
   if (role === 'admin') return '/admin';
-  return '/tournaments';
+  return '/player';
 };
 
+// Keep profile completion rules minimal so users aren't blocked
+// from accessing the app after filling basic information.
 const isProfileComplete = (user: any): boolean => {
-  return !!(
-    user.displayName &&
-    user.phone &&
-    (user.city || user.place || user.location) &&
-    user.sportsInterests &&
-    user.sportsInterests.length > 0
-  );
+  return !!(user.displayName && user.phone);
 };
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks';
 import { Button, Card, CardBody, InputField } from '../components';
@@ -6,7 +6,7 @@ import { useUIStore } from '../store';
 
 export default function Signup() {
   const navigate = useNavigate();
-  const { signUp, signInWithGoogle, loading, error } = useAuth();
+  const { user, signUp, signInWithGoogle, loading, error } = useAuth();
   const showError = useUIStore((state) => state.showError);
   const showSuccess = useUIStore((state) => state.showSuccess);
 
@@ -18,6 +18,13 @@ export default function Signup() {
     confirmPassword: '',
   });
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  // If the user is already authenticated, redirect them away from the signup page
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/player');
+    }
+  }, [loading, user, navigate]);
 
   const validateForm = () => {
     const errors: Record<string, string> = {};
@@ -58,7 +65,7 @@ export default function Signup() {
         phone: formData.phone,
       });
       showSuccess('Account created successfully!');
-      navigate('/tournaments');
+      navigate('/player');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Sign up failed';
       showError(errorMessage);
@@ -69,7 +76,7 @@ export default function Signup() {
     try {
       await signInWithGoogle();
       showSuccess('Google sign up successful!');
-      navigate('/tournaments');
+      navigate('/player');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Google sign up failed';
       showError(errorMessage);

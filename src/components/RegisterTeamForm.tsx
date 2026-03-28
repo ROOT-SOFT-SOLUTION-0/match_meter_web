@@ -4,6 +4,7 @@ import { Button } from './Button';
 import { InputField } from './InputField';
 import { Tournament, TeamRegistration } from '../types/models';
 import toast from 'react-hot-toast';
+import authService from '../services/auth.service';
 
 interface RegisterTeamFormProps {
     tournament: Tournament;
@@ -25,6 +26,16 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
         players: [''],
         customFields: {} as Record<string, string>,
     });
+
+    const [linkedPlayers, setLinkedPlayers] = useState<
+        { userId: string; name: string; phone?: string }[]
+    >([]);
+
+    const [phoneSearch, setPhoneSearch] = useState('');
+    const [phoneSearchResult, setPhoneSearchResult] = useState<
+        { userId: string; name: string; phone?: string } | null
+    >(null);
+    const [phoneSearching, setPhoneSearching] = useState(false);
 
     // Parse custom fields configuration
     const customFieldsConfig = React.useMemo(() => {
@@ -68,6 +79,13 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
                 paymentStatus: 'pending',
                 registeredAt: Date.now(),
                 notes: JSON.stringify(formData.customFields),
+                playersInfo: linkedPlayers.length
+                    ? linkedPlayers.map((p) => ({
+                        userId: p.userId,
+                        name: p.name,
+                        phone: p.phone,
+                    }))
+                    : undefined,
             };
 
             const registrationId = await firestoreService.registerTeam(
@@ -111,6 +129,51 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
         if (formData.players.length <= 1) return;
         const newPlayers = formData.players.filter((_, i) => i !== index);
         setFormData(prev => ({ ...prev, players: newPlayers }));
+    };
+
+    const handlePhoneSearch = async () => {
+        if (!phoneSearch.trim()) {
+            toast.error('Enter a phone number to search');
+            return;
+        }
+
+        setPhoneSearching(true);
+        setPhoneSearchResult(null);
+        try {
+            const user = await authService.findUserByPhone(phoneSearch.trim());
+            if (!user) {
+                toast.error('No player found with this phone number');
+                return;
+            }
+
+            setPhoneSearchResult({
+                userId: user.uid,
+                name: user.displayName || user.email || 'Player',
+                phone: user.phone,
+            });
+        } catch (error) {
+            console.error('Phone search failed:', error);
+            toast.error('Failed to search player');
+        } finally {
+            setPhoneSearching(false);
+        }
+    };
+
+    const handleAddLinkedPlayer = () => {
+        if (!phoneSearchResult) return;
+
+        if (linkedPlayers.some((p) => p.userId === phoneSearchResult.userId)) {
+            toast.error('Player already added');
+            return;
+        }
+
+        setLinkedPlayers((prev) => [...prev, phoneSearchResult]);
+        setFormData((prev) => ({
+            ...prev,
+            players: [...prev.players, phoneSearchResult.name],
+        }));
+        setPhoneSearch('');
+        setPhoneSearchResult(null);
     };
 
     return (
@@ -210,6 +273,52 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
                             </div>
                         ))}
                     </div>
+                </div>
+
+                <div className="space-y-3 pt-4 border-t">
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-gray-700">Add existing players</h3>
+                        <p className="text-xs text-gray-400">Search by phone number</p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <InputField
+                            label="Player phone"
+                            value={phoneSearch}
+                            onChange={(e) => setPhoneSearch(e.target.value)}
+                            className="flex-1"
+                        />
+                        <Button
+                            type="button"
+                            onClick={handlePhoneSearch}
+                            isLoading={phoneSearching}
+                            className="mt-6 sm:mt-5 whitespace-nowrap"
+                        >
+                            Search
+                        </Button>
+                    </div>
+                    {phoneSearchResult && (
+                        <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                            <div>
+                                <p className="font-semibold">{phoneSearchResult.name}</p>
+                                {phoneSearchResult.phone && (
+                                    <p className="text-[11px]">{phoneSearchResult.phone}</p>
+                                )}
+                            </div>
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={handleAddLinkedPlayer}
+                            >
+                                Add to team
+                            </Button>
+                        </div>
+                    )}
+
+                    {linkedPlayers.length > 0 && (
+                        <div className="text-xs text-gray-500">
+                            Linked players: {linkedPlayers.map((p) => p.name).join(', ')}
+                        </div>
+                    )}
                 </div>
 
                 <div className="pt-6">

@@ -8,7 +8,7 @@ import authService from '../services/auth.service';
 const getLandingRouteByRole = (role?: 'user' | 'admin' | 'super_admin') => {
   if (role === 'super_admin') return '/super-admin';
   if (role === 'admin') return '/admin';
-  return '/tournaments';
+  return '/player';
 };
 
 export default function Login() {

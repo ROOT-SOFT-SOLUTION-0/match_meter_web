@@ -3,6 +3,7 @@ import { TournamentService } from '../services/tournament.service';
 import { Button } from './Button';
 import { InputField } from './InputField';
 import { Card } from './Card';
+import { ImageUploader } from './ImageUploader';
 import toast from 'react-hot-toast';
 
 interface CreateTournamentFormProps {
@@ -27,6 +28,8 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
     endDate: '',
     registrationDeadline: '',
     bracketFormat: 'single_elimination' as const,
+    image: '',
+    highlightVideoUrl: '',
   });
 
   const handleInputChange = (
@@ -97,7 +100,8 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
           endDate: endTime,
           registrationDeadline: regDeadline,
           bracketFormat: formData.bracketFormat,
-          image: '',
+          image: formData.image || '',
+          highlightVideoUrl: formData.highlightVideoUrl || '',
           rules: '',
           schedule: '',
         },
@@ -116,7 +120,7 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
   };
 
   return (
-    <Card className="p-6 max-w-2xl">
+    <Card className="p-6 w-full max-w-4xl mx-auto">
       <h2 className="text-2xl font-bold mb-6">Create Tournament</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -239,6 +243,40 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
             onChange={handleInputChange}
             required
           />
+        </div>
+
+        {/* Media */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Cover image
+            </label>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Optional banner for this tournament. Shown in feeds and detail pages.
+            </p>
+            <ImageUploader
+              folder="tournaments"
+              onSuccess={(url) => {
+                setFormData((prev) => ({ ...prev, image: url }));
+                toast.success('Cover image uploaded');
+              }}
+              onError={(error) => toast.error(error)}
+              disabled={loading}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <InputField
+              label="Highlight video URL"
+              name="highlightVideoUrl"
+              value={formData.highlightVideoUrl}
+              onChange={handleInputChange}
+              placeholder="YouTube Shorts or Google Drive link (optional)"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Paste a public YouTube or Drive link. We will embed this clip in the player feed.
+            </p>
+          </div>
         </div>
 
         {/* Actions */}
