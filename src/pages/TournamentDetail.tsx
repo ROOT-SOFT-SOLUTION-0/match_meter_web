@@ -22,8 +22,8 @@ export default function TournamentDetail() {
   }
 
   // Helper function for consistent date formatting
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  const formatDate = (date: number | string) => {
+    return new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

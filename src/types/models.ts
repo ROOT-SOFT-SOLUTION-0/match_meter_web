@@ -38,6 +38,8 @@ export interface Tournament {
   updatedAt: number;
   rules?: string;
   schedule?: string;
+  prizePool?: number;
+  registrationFormConfig?: string;
 }
 
 // Match Types

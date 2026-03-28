@@ -22,7 +22,19 @@ export class TournamentService {
    * Create a new tournament (Admin only)
    */
   static async createTournament(
-    data: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt'> & {
+    data: {
+      name: string;
+      description: string;
+      sport: string;
+      location: string;
+      maxTeams: number;
+      entryFee: number;
+      currency: string;
+      startDate: number;
+      endDate: number;
+      image?: string;
+      rules?: string;
+      schedule?: string;
       registrationDeadline: number;
       bracketFormat: 'single_elimination' | 'double_elimination';
     },

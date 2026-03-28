@@ -33,8 +33,13 @@ interface CardHeaderProps {
   icon?: React.ReactNode;
 }
 
-export const CardHeader: React.FC<CardHeaderProps> = ({ title, subtitle, icon }) => (
-  <div className="flex items-center gap-3 pb-3 mb-3 border-b border-gray-100 dark:border-gray-800/50">
+export const CardHeader: React.FC<CardHeaderProps & { className?: string }> = ({
+  title,
+  subtitle,
+  icon,
+  className = '',
+}) => (
+  <div className={`flex items-center gap-3 pb-3 mb-3 border-b border-gray-100 dark:border-gray-800/50 ${className}`}>
     {icon && <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gray-50 dark:bg-gray-800 text-xl">{icon}</div>}
     <div>
       <h3 className="text-[15px] font-semibold text-gray-900 dark:text-gray-100 leading-tight">{title}</h3>

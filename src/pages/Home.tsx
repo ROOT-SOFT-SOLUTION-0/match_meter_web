@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks';
-import { Button, Card, CardBody, CardHeader, Badge } from '../components';
+import { Button, Card, CardBody, Badge } from '../components';
 import {
   Activity,
   Calendar,
@@ -24,12 +24,6 @@ const STATS = [
   { id: 'teams', label: 'Teams', value: '5', trend: '—', trendLabel: 'stable' },
   { id: 'upcoming', label: 'Days to next match', value: '2', trend: 'Sat 2PM', trendLabel: 'next kick-off' },
   { id: 'performance', label: 'Global rank', value: '#14', trend: 'Top 5%', trendLabel: 'division' },
-] as const;
-
-const RECENT_TOURNAMENTS = [
-  { id: 1, name: 'Regional Cricket Cup', sport: 'Cricket', date: 'Mar 28', status: 'ongoing', progress: 65 },
-  { id: 2, name: 'Premier Football League', sport: 'Football', date: 'Apr 05', status: 'upcoming', progress: 0 },
-  { id: 3, name: 'City Basketball Open', sport: 'Basketball', date: 'Mar 20', status: 'completed', progress: 100 },
 ] as const;
 
 const FEATURES = [
