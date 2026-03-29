@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useTournamentStore } from '../store';
+import { useAuthStore, useTournamentStore } from '../store';
 import { Card, CardHeader, CardBody, Loading, Button } from '../components';
 import { Link } from 'react-router-dom';
 
 export default function Tournaments() {
+  const user = useAuthStore((state) => state.user);
   const {
     tournaments,
     loading,
@@ -35,9 +36,11 @@ export default function Tournaments() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Tournaments</h1>
           <p className="text-gray-600 dark:text-gray-400">Discover and join tournaments</p>
         </div>
-        <Link to="/create-tournament">
-          <Button>Create Tournament</Button>
-        </Link>
+        {(user?.role === 'admin' || user?.role === 'super_admin') && (
+          <Link to="/create-tournament">
+            <Button>Create Tournament</Button>
+          </Link>
+        )}
       </div>
 
       {/* Search */}
