@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useAuthStore, useTournamentStore } from '../store';
+import { useTournamentStore } from '../store';
+import { useAuth } from '../hooks';
 import { Card, CardHeader, CardBody, Loading, Button } from '../components';
 import { Link } from 'react-router-dom';
 
 export default function Tournaments() {
-  const user = useAuthStore((state) => state.user);
+  const { user } = useAuth();
   const {
     tournaments,
     loading,

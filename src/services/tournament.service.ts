@@ -4,6 +4,7 @@ import {
   where,
   getDocs,
   addDoc,
+  setDoc,
   updateDoc,
   doc,
   getDoc,
@@ -42,7 +43,11 @@ export class TournamentService {
     userId: string
   ): Promise<string> {
     try {
-      const tournamentRef = await addDoc(collection(db, 'tournaments'), {
+      // Create tournament with explicit ID so it matches security rules
+      const tournamentRef = doc(collection(db, 'tournaments'));
+
+      await setDoc(tournamentRef, {
+        id: tournamentRef.id,
         ...data,
         createdBy: userId,
         totalTeams: 0,

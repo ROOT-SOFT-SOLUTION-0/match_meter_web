@@ -4,6 +4,7 @@ import { Button } from './Button';
 import { InputField } from './InputField';
 import { Card } from './Card';
 import { ImageUploader } from './ImageUploader';
+import { useAuth } from '../hooks';
 import toast from 'react-hot-toast';
 
 interface CreateTournamentFormProps {
@@ -15,6 +16,7 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
   onSuccess,
   onClose,
 }) => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -76,17 +78,13 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
       return;
     }
 
+    if (!user) {
+      toast.error('User not authenticated');
+      return;
+    }
+
     setLoading(true);
     try {
-      // Get current user from localStorage (adjust based on your auth setup)
-      const userStr = localStorage.getItem('user');
-      if (!userStr) {
-        toast.error('User not authenticated');
-        return;
-      }
-
-      const user = JSON.parse(userStr);
-
       const tournamentId = await TournamentService.createTournament(
         {
           name: formData.name,

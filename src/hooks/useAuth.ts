@@ -37,23 +37,42 @@ export function useAuth(): UseAuthReturn {
 
   // Subscribe to auth state changes
   useEffect(() => {
-    const unsubscribe = authService.onAuthStateChange(async (currentUser) => {
+    let unsubscribeProfile: (() => void) | null = null;
+
+    const unsubscribeAuth = authService.onAuthStateChange((currentUser) => {
+      // Clean up previous profile listener when auth user changes
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+        unsubscribeProfile = null;
+      }
+
       if (currentUser) {
-        try {
-          const userProfile = await authService.getUserProfile(currentUser.uid);
-          setUser(userProfile);
-          setError(null);
-        } catch (err) {
-          console.error('Failed to load user profile:', err);
-          setError('Failed to load user profile');
-        }
+        setLoading(true);
+        unsubscribeProfile = authService.onUserProfileChange(
+          currentUser.uid,
+          (userProfile) => {
+            setUser(userProfile);
+            setError(null);
+            setLoading(false);
+          },
+          (err) => {
+            console.error('Failed to listen to user profile:', err);
+            setError('Failed to load user profile');
+            setLoading(false);
+          }
+        );
       } else {
         setUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+      }
+    };
   }, []);
 
   const signUp = async (email: string, password: string, userData: Partial<User>) => {

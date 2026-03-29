@@ -9,7 +9,7 @@ import {
   onAuthStateChanged,
 } from 'firebase/auth';
 import { auth, googleProvider, db } from './firebase';
-import { collection, doc, getDocs, query, setDoc, getDoc, Timestamp, where, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, query, setDoc, getDoc, Timestamp, where, updateDoc, onSnapshot } from 'firebase/firestore';
 import { User } from '../types/models';
 
 class AuthService {
@@ -189,6 +189,54 @@ class AuthService {
 
   getCurrentUser() {
     return auth.currentUser;
+  }
+
+  /**
+   * Subscribe to real-time changes for the current user's profile document.
+   * Returns an unsubscribe function. This keeps role/flags in sync without manual refresh.
+   */
+  onUserProfileChange(
+    uid: string,
+    callback: (user: User | null) => void,
+    onError?: (error: unknown) => void
+  ): () => void {
+    const userRef = doc(db, 'users', uid);
+
+    return onSnapshot(
+      userRef,
+      (docSnap) => {
+        if (!docSnap.exists()) {
+          callback(null);
+          return;
+        }
+
+        const data = docSnap.data();
+        const user: User = {
+          uid: docSnap.id,
+          email: data.email,
+          displayName: data.displayName,
+          photoURL: data.photoURL,
+          phone: data.phone,
+          city: data.city,
+          role: data.role || 'user',
+          createdAt: data.createdAt?.toMillis?.() || data.createdAt || Date.now(),
+          age: data.age,
+          place: data.place,
+          location: data.location,
+          aadharNumber: data.aadharNumber,
+          dateOfBirth: data.dateOfBirth,
+          sportsInterests: data.sportsInterests || [],
+          profileImage: data.profileImage,
+          is_premium: data.is_premium,
+        };
+
+        callback(user);
+      },
+      (error) => {
+        console.error('Error listening to user profile changes:', error);
+        if (onError) onError(error);
+      }
+    );
   }
 
   /**
