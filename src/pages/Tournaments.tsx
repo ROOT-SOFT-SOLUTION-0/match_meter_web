@@ -68,7 +68,15 @@ export default function Tournaments() {
       {/* Tournaments Grid */}
       {filteredTournaments.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTournaments.map((tournament) => (
+          {filteredTournaments.map((tournament) => {
+            const getStatusLabel = (status: string) => {
+              if (status === 'draft') return 'Registration is started';
+              if (status === 'active') return 'Ongoing';
+              if (status === 'completed') return 'Completed';
+              return status;
+            };
+
+            return (
             <Link key={tournament.id} to={`/tournaments/${tournament.id}`}>
               <Card hoverable className="h-full cursor-pointer">
                 <CardHeader
@@ -85,7 +93,7 @@ export default function Tournaments() {
                         tournament.status === 'completed' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' :
                         'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                       }`}>
-                        {tournament.status}
+                        {getStatusLabel(tournament.status)}
                       </span>
                     </div>
 
@@ -111,7 +119,8 @@ export default function Tournaments() {
                 </CardBody>
               </Card>
             </Link>
-          ))}
+          );
+          })}
         </div>
       ) : (
         <Card>

@@ -153,7 +153,13 @@ export const TournamentManagement: React.FC = () => {
                               : 'text-yellow-600'
                         }`}
                       >
-                        {tournament.status.toUpperCase()}
+                        {tournament.status === 'draft'
+                          ? 'Registration is started'
+                          : tournament.status === 'active'
+                            ? 'Ongoing'
+                            : tournament.status === 'completed'
+                              ? 'Completed'
+                              : tournament.status.toUpperCase()}
                       </p>
                     </div>
                   </div>

@@ -7,13 +7,14 @@ interface ModalProps {
   children: React.ReactNode;
   onClose: () => void;
   footer?: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'full';
 }
 
-const sizeClasses = {
+const sizeClasses: Record<NonNullable<ModalProps['size']>, string> = {
   sm: 'max-w-sm',
   md: 'max-w-md',
   lg: 'max-w-lg',
+  full: 'max-w-5xl h-[90vh]',
 };
 
 export const Modal: React.FC<ModalProps> = ({
@@ -54,7 +55,15 @@ export const Modal: React.FC<ModalProps> = ({
           </div>
 
           {/* Content */}
-          <div className="p-6 max-h-96 overflow-y-auto">{children}</div>
+          <div
+            className={
+              size === 'full'
+                ? 'p-6 max-h-[calc(100vh-9rem)] overflow-y-auto'
+                : 'p-6 max-h-96 overflow-y-auto'
+            }
+          >
+            {children}
+          </div>
 
           {/* Footer */}
           {footer && <div className="p-6 border-t border-gray-200 dark:border-gray-700">{footer}</div>}

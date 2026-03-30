@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TournamentService } from '../services/tournament.service';
 import { Button } from './Button';
-import { InputField } from './InputField';
+import { InputField, Select } from './InputField';
 import { Card } from './Card';
 import { ImageUploader } from './ImageUploader';
 import { useAuth } from '../hooks';
@@ -16,6 +16,25 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
   onSuccess,
   onClose,
 }) => {
+  const SPORT_OPTIONS = [
+    'Cricket',
+    'Football',
+    'Basketball',
+    'Volleyball',
+    'Badminton',
+    'Tennis',
+    'Table Tennis',
+    'Kabaddi',
+    'Hockey',
+    'Rugby',
+    'Swimming',
+    'Track & Field',
+    'Boxing',
+    'Wrestling',
+    'Martial Arts',
+    'Chess',
+  ];
+
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -24,6 +43,7 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
     sport: '',
     location: '',
     maxTeams: 16,
+    maxPlayersPerTeam: 11,
     entryFee: 0,
     currency: 'INR',
     startDate: '',
@@ -43,30 +63,56 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
     setFormData((prev) => ({
       ...prev,
       [name]:
-        name === 'maxTeams' || name === 'entryFee'
+        name === 'maxTeams' || name === 'entryFee' || name === 'maxPlayersPerTeam'
           ? parseInt(value) || 0
           : value,
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    // Prevent accidental double-submit from creating duplicate tournaments
+    if (loading) return;
+
+    // Read the latest values directly from the form to avoid
+    // any issues where the datetime inputs only commit on blur.
+    const formElement = e.currentTarget;
+    const nativeFormData = new FormData(formElement);
+
+    const name = (nativeFormData.get('name') as string) || '';
+    const sport = (nativeFormData.get('sport') as string) || '';
+    const location = (nativeFormData.get('location') as string) || '';
+    const registrationDeadlineStr =
+      (nativeFormData.get('registrationDeadline') as string) || '';
+    const startDateStr = (nativeFormData.get('startDate') as string) || '';
+    const endDateStr = (nativeFormData.get('endDate') as string) || '';
+
     if (
-      !formData.name ||
-      !formData.sport ||
-      !formData.location ||
-      !formData.startDate ||
-      !formData.endDate ||
-      !formData.registrationDeadline
+      !name ||
+      !sport ||
+      !location ||
+      !startDateStr ||
+      !endDateStr ||
+      !registrationDeadlineStr
     ) {
       toast.error('Please fill all required fields');
       return;
     }
 
-    const startTime = new Date(formData.startDate).getTime();
-    const endTime = new Date(formData.endDate).getTime();
-    const regDeadline = new Date(formData.registrationDeadline).getTime();
+    const startTime = new Date(startDateStr).getTime();
+    const endTime = new Date(endDateStr).getTime();
+    const regDeadline = new Date(registrationDeadlineStr).getTime();
+
+    if (formData.maxTeams < 2 || formData.maxTeams > 128) {
+      toast.error('Max teams must be between 2 and 128');
+      return;
+    }
+
+    if (formData.maxPlayersPerTeam < 1 || formData.maxPlayersPerTeam > 25) {
+      toast.error('Players per team must be between 1 and 25');
+      return;
+    }
 
     if (regDeadline > startTime) {
       toast.error('Registration deadline must be before tournament start');
@@ -83,14 +129,25 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
       return;
     }
 
+    // Keep React state in sync with what the user actually submitted
+    setFormData((prev) => ({
+      ...prev,
+      name,
+      sport,
+      location,
+      startDate: startDateStr,
+      endDate: endDateStr,
+      registrationDeadline: registrationDeadlineStr,
+    }));
+
     setLoading(true);
     try {
       const tournamentId = await TournamentService.createTournament(
         {
-          name: formData.name,
+          name,
           description: formData.description,
-          sport: formData.sport,
-          location: formData.location,
+          sport,
+          location,
           maxTeams: formData.maxTeams,
           entryFee: formData.entryFee,
           currency: formData.currency,
@@ -98,6 +155,7 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
           endDate: endTime,
           registrationDeadline: regDeadline,
           bracketFormat: formData.bracketFormat,
+          maxPlayersPerTeam: formData.maxPlayersPerTeam,
           image: formData.image || '',
           highlightVideoUrl: formData.highlightVideoUrl || '',
           rules: '',
@@ -149,12 +207,12 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
 
         {/* Sport & Location Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <InputField
+          <Select
             label="Sport *"
             name="sport"
             value={formData.sport}
             onChange={handleInputChange}
-            placeholder="e.g., Football, Cricket"
+            options={SPORT_OPTIONS.map((sport) => ({ value: sport, label: sport }))}
             required
           />
           <InputField
@@ -167,30 +225,37 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
           />
         </div>
 
-        {/* Max Teams & Entry Fee Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Max Teams *
-            </label>
-            <select
-              name="maxTeams"
-              value={formData.maxTeams}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm focus:ring-1 focus:ring-primary focus:border-primary dark:bg-gray-800 dark:text-white"
-            >
-              <option value={8}>8 Teams</option>
-              <option value={16}>16 Teams</option>
-              <option value={32}>32 Teams</option>
-              <option value={64}>64 Teams</option>
-              <option value={128}>128 Teams</option>
-            </select>
-          </div>
+        {/* Max Teams & Players per Team & Entry Fee Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <InputField
+            label="Max Teams *"
+            name="maxTeams"
+            type="number"
+            min={2}
+            max={128}
+            value={formData.maxTeams}
+            onChange={handleInputChange}
+            helperText="Total number of teams allowed in this tournament."
+            required
+          />
+
+          <InputField
+            label="Players per Team *"
+            name="maxPlayersPerTeam"
+            type="number"
+            min={1}
+            max={25}
+            value={formData.maxPlayersPerTeam}
+            onChange={handleInputChange}
+            helperText="How many players each team can register (1-25)."
+            required
+          />
 
           <InputField
             label="Entry Fee"
             name="entryFee"
-            type="number"
+            type="text"
+            inputMode="decimal"
             value={formData.entryFee}
             onChange={handleInputChange}
             placeholder="0"
@@ -218,7 +283,7 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
           <InputField
             label="Registration Deadline *"
             name="registrationDeadline"
-            type="datetime-local"
+            type="date"
             value={formData.registrationDeadline}
             onChange={handleInputChange}
             required
@@ -227,7 +292,7 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
           <InputField
             label="Start Date *"
             name="startDate"
-            type="datetime-local"
+            type="date"
             value={formData.startDate}
             onChange={handleInputChange}
             required
@@ -236,7 +301,7 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
           <InputField
             label="End Date *"
             name="endDate"
-            type="datetime-local"
+            type="date"
             value={formData.endDate}
             onChange={handleInputChange}
             required

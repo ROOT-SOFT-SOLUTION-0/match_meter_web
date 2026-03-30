@@ -39,6 +39,7 @@ export class TournamentService {
       schedule?: string;
       registrationDeadline: number;
       bracketFormat: 'single_elimination' | 'double_elimination';
+      maxPlayersPerTeam?: number;
     },
     userId: string
   ): Promise<string> {

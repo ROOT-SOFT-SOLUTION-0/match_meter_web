@@ -126,6 +126,15 @@ export default function TournamentDetail() {
               className="pb-4 border-b border-gray-100 dark:border-gray-700 mb-6"
             />
             <CardBody className="space-y-6">
+              {(() => {
+                const getStatusLabel = (status: string) => {
+                  if (status === 'draft') return 'Registration is started';
+                  if (status === 'active') return 'Ongoing';
+                  if (status === 'completed') return 'Completed';
+                  return status;
+                };
+
+                return (
               <div>
                 <label className="text-sm font-medium text-gray-500 dark:text-gray-400 block mb-1">Status</label>
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
@@ -135,9 +144,12 @@ export default function TournamentDetail() {
                     ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
                     : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                 }`}>
-                  {selectedTournament.status.charAt(0).toUpperCase() + selectedTournament.status.slice(1)} {/* Capitalize status */}
+                  {getStatusLabel(selectedTournament.status)}
                 </span>
               </div>
+
+                );
+              })()}
 
               <div>
                 <label className="text-sm font-medium text-gray-500 dark:text-gray-400 block mb-1">Dates</label>
@@ -211,7 +223,7 @@ export default function TournamentDetail() {
         isOpen={showRegisterModal}
         onClose={() => setShowRegisterModal(false)}
         title="Register Team"
-        size="lg"
+        size="full"
       >
         <RegisterTeamForm
           tournament={selectedTournament}

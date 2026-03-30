@@ -100,9 +100,21 @@ const getTitle = (pathname: string): string => {
   return 'Match Control';
 };
 
+// Normalize certain detail routes to their parent section so the
+// correct sidebar item is highlighted (e.g. tournament workflow
+// pages should keep "Manage Tournaments" active, not Admin Dashboard).
+const getEffectivePathname = (pathname: string): string => {
+  if (pathname.startsWith('/admin/tournament/')) {
+    return '/admin/tournaments';
+  }
+
+  return pathname;
+};
+
 export const Sidebar: React.FC = () => {
   const { user } = useAuth();
   const location = useLocation();
+  const effectivePathname = getEffectivePathname(location.pathname);
   const isSidebarOpen = useUIStore((state) => state.isSidebarOpen);
   const isSidebarCollapsed = useUIStore((state) => state.isSidebarCollapsed);
   const setSidebarOpen = useUIStore((state) => state.setSidebarOpen);
@@ -119,8 +131,8 @@ export const Sidebar: React.FC = () => {
     .slice()
     .sort((a, b) => b.path.length - a.path.length)
     .find((item) => {
-      if (location.pathname === item.path) return true;
-      if (item.path !== '/' && location.pathname.startsWith(`${item.path}/`)) return true;
+      if (effectivePathname === item.path) return true;
+      if (item.path !== '/' && effectivePathname.startsWith(`${item.path}/`)) return true;
       return false;
     });
 

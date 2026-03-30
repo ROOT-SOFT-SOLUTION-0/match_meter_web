@@ -31,6 +31,7 @@ export interface Tournament {
   location: string;
   totalTeams: number;
   maxTeams: number;
+  maxPlayersPerTeam?: number;
   entryFee: number;
   currency: string;
   image?: string;

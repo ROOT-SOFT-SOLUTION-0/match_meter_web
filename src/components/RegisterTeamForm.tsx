@@ -23,7 +23,6 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
         captainName: '',
         captainEmail: '',
         captainPhone: '',
-        players: [''],
         customFields: {} as Record<string, string>,
     });
 
@@ -36,6 +35,8 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
         { userId: string; name: string; phone?: string } | null
     >(null);
     const [phoneSearching, setPhoneSearching] = useState(false);
+
+    const maxPlayersPerTeam = tournament.maxPlayersPerTeam ?? 25;
 
     // Parse custom fields configuration
     const customFieldsConfig = React.useMemo(() => {
@@ -65,6 +66,18 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
             }
         }
 
+        const playerNames = linkedPlayers.map((p) => p.name);
+
+        if (playerNames.length === 0) {
+            toast.error('Please add at least one player using the search below');
+            return;
+        }
+
+        if (playerNames.length > maxPlayersPerTeam) {
+            toast.error(`You can add up to ${maxPlayersPerTeam} players for this tournament`);
+            return;
+        }
+
         setLoading(true);
         try {
             const registrationData: Partial<TeamRegistration> = {
@@ -73,8 +86,8 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
                 captain: formData.captainName,
                 captainEmail: formData.captainEmail,
                 captainPhone: formData.captainPhone,
-                players: formData.players.filter(p => p.trim() !== ''),
-                totalMembers: formData.players.filter(p => p.trim() !== '').length,
+                players: playerNames,
+                totalMembers: playerNames.length,
                 status: 'pending',
                 paymentStatus: 'pending',
                 registeredAt: Date.now(),
@@ -115,22 +128,6 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
         }));
     };
 
-    const handlePlayerChange = (index: number, value: string) => {
-        const newPlayers = [...formData.players];
-        newPlayers[index] = value;
-        setFormData(prev => ({ ...prev, players: newPlayers }));
-    };
-
-    const addPlayer = () => {
-        setFormData(prev => ({ ...prev, players: [...prev.players, ''] }));
-    };
-
-    const removePlayer = (index: number) => {
-        if (formData.players.length <= 1) return;
-        const newPlayers = formData.players.filter((_, i) => i !== index);
-        setFormData(prev => ({ ...prev, players: newPlayers }));
-    };
-
     const handlePhoneSearch = async () => {
         if (!phoneSearch.trim()) {
             toast.error('Enter a phone number to search');
@@ -167,11 +164,12 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
             return;
         }
 
+        if (linkedPlayers.length >= maxPlayersPerTeam) {
+            toast.error(`You can add up to ${maxPlayersPerTeam} players`);
+            return;
+        }
+
         setLinkedPlayers((prev) => [...prev, phoneSearchResult]);
-        setFormData((prev) => ({
-            ...prev,
-            players: [...prev.players, phoneSearchResult.name],
-        }));
         setPhoneSearch('');
         setPhoneSearchResult(null);
     };
@@ -241,38 +239,42 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
                     </div>
                 )}
 
-                {/* Player List */}
-                <div className="space-y-4 pt-4 border-t">
+                {/* Selected Players (existing app users only) */}
+                <div className="space-y-3 pt-4 border-t">
                     <div className="flex items-center justify-between">
-                        <h3 className="font-semibold text-gray-700">Player List</h3>
-                        <button
-                            type="button"
-                            onClick={addPlayer}
-                            className="text-sm text-primary hover:underline font-medium"
-                        >
-                            + Add Player
-                        </button>
+                        <div>
+                            <h3 className="font-semibold text-gray-700">Selected Players</h3>
+                            <p className="text-xs text-gray-500 mt-1">
+                                {`Add players using phone search below. You can add up to ${maxPlayersPerTeam} players for this tournament.`}
+                            </p>
+                        </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {formData.players.map((player, index) => (
-                            <div key={index} className="flex gap-2">
-                                <InputField
-                                    label={`Player ${index + 1}`}
-                                    value={player}
-                                    onChange={(e) => handlePlayerChange(index, e.target.value)}
-                                    className="flex-1"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => removePlayer(index)}
-                                    className="mt-8 text-red-500 hover:text-red-700"
-                                    disabled={formData.players.length <= 1}
+
+                    {linkedPlayers.length === 0 ? (
+                        <p className="text-xs text-gray-500">
+                            No players added yet. Use the search below to add registered players from this app.
+                        </p>
+                    ) : (
+                        <div className="flex flex-wrap gap-2">
+                            {linkedPlayers.map((p) => (
+                                <div
+                                    key={p.userId}
+                                    className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs border border-emerald-200"
                                 >
-                                    ✕
-                                </button>
-                            </div>
-                        ))}
-                    </div>
+                                    <span className="font-medium">{p.name}</span>
+                                    {p.phone && <span className="text-[10px] text-emerald-700">{p.phone}</span>}
+                                    <button
+                                        type="button"
+                                        onClick={() => setLinkedPlayers((prev) => prev.filter((lp) => lp.userId !== p.userId))}
+                                        className="text-emerald-700 hover:text-emerald-900"
+                                        aria-label="Remove player"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <div className="space-y-3 pt-4 border-t">
