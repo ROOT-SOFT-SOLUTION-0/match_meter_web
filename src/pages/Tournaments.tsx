@@ -38,7 +38,7 @@ export default function Tournaments() {
           <p className="text-gray-600 dark:text-gray-400">Discover and join tournaments</p>
         </div>
         {(user?.role === 'admin' || user?.role === 'super_admin') && (
-          <Link to="/create-tournament">
+          <Link to="/admin/tournaments">
             <Button>Create Tournament</Button>
           </Link>
         )}

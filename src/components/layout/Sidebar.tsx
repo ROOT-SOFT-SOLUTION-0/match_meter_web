@@ -57,12 +57,6 @@ const navItems: SidebarItem[] = [
     roles: ['admin', 'super_admin'],
   },
   {
-    label: 'Create Tournament',
-    path: '/create-tournament',
-    icon: <Trophy className="h-4 w-4" aria-hidden="true" />,
-    roles: ['admin', 'super_admin'],
-  },
-  {
     label: 'Super Admin',
     path: '/super-admin',
     icon: <Shield className="h-4 w-4" aria-hidden="true" />,
