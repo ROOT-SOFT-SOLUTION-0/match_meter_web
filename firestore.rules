@@ -14,12 +14,12 @@ service cloud.firestore {
     }
 
     function isSuperAdmin() {
-      return hasRole('superadmin');
+      return hasRole('super_admin');
     }
 
     function isAdminOrSuperAdmin() {
       return isSignedIn() &&
-        (userDoc().data.role == 'admin' || userDoc().data.role == 'superadmin');
+        (userDoc().data.role == 'admin' || userDoc().data.role == 'super_admin');
     }
 
     function hasSuccessfulAdminUpgradePayment(userId) {
@@ -70,8 +70,8 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn() &&
         request.auth.uid == userId &&
-        request.resource.data.id == userId &&
-        request.resource.data.role == 'user';
+        (request.resource.data.uid == userId || request.resource.data.id == userId) &&
+        (request.resource.data.role == 'user' || request.resource.data.role == 'super_admin');
       allow update: if isSignedIn() && (
         isSuperAdmin() ||
         (
