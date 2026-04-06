@@ -34,6 +34,7 @@ export class TournamentService {
       startDate: number;
       endDate: number;
       image?: string;
+      paymentQrCode?: string;
       highlightVideoUrl?: string;
       rules?: string;
       schedule?: string;

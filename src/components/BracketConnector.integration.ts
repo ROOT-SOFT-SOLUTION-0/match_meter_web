@@ -8,7 +8,7 @@
  * 4. ResizeObserver triggers canvas redraw on dimension changes
  */
 
-import { BracketMatch, BracketTeam } from '../types';
+import { BracketMatch } from '../types/models';
 
 export class BracketConnectorIntegrationTest {
   /**
@@ -93,7 +93,7 @@ export class BracketConnectorIntegrationTest {
    * Test: Connectors render only when appropriate (2+ rounds)
    */
   static testConnectorVisibility(matches: BracketMatch[]): boolean {
-    const uniqueRounds = new Set(matches.map((m) => m.roundNumber));
+    const uniqueRounds = new Set(matches.map((m) => m.round));
 
     if (uniqueRounds.size < 2) {
       console.log('✅ Correctly skipping connectors for single-round bracket');

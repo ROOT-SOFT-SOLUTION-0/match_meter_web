@@ -169,7 +169,11 @@ export const AdminTournamentWorkflow: React.FC = () => {
     if (seedingMode === 'random') {
       seededTeams = seededTeams.sort(() => Math.random() - 0.5);
     } else if (seedingMode === 'ranking') {
-      seededTeams = seededTeams.sort((a, b) => (a.seed || 999) - (b.seed || 999));
+      seededTeams = seededTeams.sort((a, b) => {
+        const aSeed = (a as TeamRegistration & { seed?: number }).seed ?? 999;
+        const bSeed = (b as TeamRegistration & { seed?: number }).seed ?? 999;
+        return aSeed - bSeed;
+      });
     }
     // manual will be handled by drag-and-drop later
 

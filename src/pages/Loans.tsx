@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, CardBody, CardHeader, Button, Badge } from '../components';
+import { Card, CardBody, Button, Badge } from '../components';
 import { mockLoans, Loan } from '../data/loans';
 
 const statusToBadgeVariant = (status: Loan['status']) => {
   if (status === 'active') return 'success' as const;
   if (status === 'overdue') return 'danger' as const;
-  return 'neutral' as const;
+  return 'default' as const;
 };
 
 export default function Loans() {

@@ -16,7 +16,6 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Tournament, Match, TeamRegistration, Payment } from '../types/models';
-import { TournamentService } from './tournament.service';
 
 class FirestoreService {
   // ==================== TOURNAMENTS ====================

@@ -22,13 +22,13 @@ const buildEmbedUrl = (raw: string): string => {
 
     // YouTube regular + Shorts + youtu.be
     if (host.includes('youtube.com')) {
-      let videoId = url.searchParams.get('v');
+      let videoId: string | null = url.searchParams.get('v');
       
       // Handle youtube.com/shorts/VIDEO_ID
       if (!videoId && url.pathname.includes('/shorts/')) {
-        videoId = url.pathname.split('/shorts/')[1].split('/')[0];
+        videoId = url.pathname.split('/shorts/')[1]?.split('/')[0] ?? null;
       } else if (!videoId) {
-        videoId = url.pathname.split('/').filter(Boolean).pop();
+        videoId = url.pathname.split('/').filter(Boolean).pop() ?? null;
       }
 
       if (videoId) {
@@ -39,10 +39,6 @@ const buildEmbedUrl = (raw: string): string => {
       const videoId = url.pathname.slice(1);
       if (videoId) {
         return `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
-      }
-      const videoId = url.pathname.split('/').filter(Boolean).pop();
-      if (videoId) {
-        return `https://www.youtube.com/embed/${videoId}`;
       }
     }
 
