@@ -3,12 +3,20 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTournamentStore } from '../store';
 import { Card, CardHeader, CardBody, Button, Loading, Modal } from '../components';
 import { RegisterTeamForm } from '../components/RegisterTeamForm';
+import { useAuth } from '../hooks';
+import firestoreService from '../services/firestore.service';
+import { BracketService } from '../services/bracket.service';
 
 export default function TournamentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { selectedTournament, loading, loadTournamentById, loadMatches } = useTournamentStore();
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const { user } = useAuth();
+  const [hasRegistration, setHasRegistration] = useState(false);
+  const [registrationStatus, setRegistrationStatus] = useState<string | null>(null);
+  const [entriesCount, setEntriesCount] = useState<number>(0);
+  const [hasBracket, setHasBracket] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -16,6 +24,53 @@ export default function TournamentDetail() {
       loadMatches(id);
     }
   }, [id, loadTournamentById, loadMatches]);
+
+  useEffect(() => {
+    const loadEntries = async () => {
+      if (!id) return;
+      const regs = await firestoreService.getTeamRegistrations(id);
+      // Count only non-rejected registrations towards capacity/entries
+      const activeRegs = regs.filter(reg => reg.status !== 'rejected');
+      setEntriesCount(activeRegs.length);
+    };
+
+    loadEntries();
+  }, [id]);
+
+  useEffect(() => {
+    const loadBracketStatus = async () => {
+      if (!id) return;
+      try {
+        const bracketMatches = await BracketService.getBracket(id);
+        setHasBracket(bracketMatches.length > 0);
+      } catch {
+        setHasBracket(false);
+      }
+    };
+
+    loadBracketStatus();
+  }, [id]);
+
+  useEffect(() => {
+    const checkUserRegistration = async () => {
+      if (!id || !user) {
+        setHasRegistration(false);
+        setRegistrationStatus(null);
+        return;
+      }
+
+      const reg = await firestoreService.getUserRegistrationForTournament(id, user.uid);
+      if (reg) {
+        setHasRegistration(true);
+        setRegistrationStatus(reg.status);
+      } else {
+        setHasRegistration(false);
+        setRegistrationStatus(null);
+      }
+    };
+
+    checkUserRegistration();
+  }, [id, user]);
 
   if (loading || !selectedTournament) {
     return <Loading fullscreen message="Loading tournament details..." />;
@@ -31,13 +86,17 @@ export default function TournamentDetail() {
   };
 
   const isRegistrationOpen = selectedTournament.status === 'draft';
+  const isTournamentFull =
+    typeof selectedTournament.maxTeams === 'number' &&
+    selectedTournament.maxTeams > 0 &&
+    entriesCount >= selectedTournament.maxTeams;
   const dateRange = `${formatDate(selectedTournament.startDate)} 
   – ${formatDate(selectedTournament.endDate)}`;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <div className="min-w-0">
+      <div className="mb-6 flex flex-col gap-4">
+        <div className="min-w-0 w-full">
           <button
             onClick={() => navigate('/tournaments')}
             className="mb-3 inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors"
@@ -59,6 +118,13 @@ export default function TournamentDetail() {
             </svg>
             Back to tournaments
           </button>
+
+          {selectedTournament.image && (
+            <div className="w-full h-48 md:h-72 lg:h-96 rounded-2xl overflow-hidden mb-6 bg-gray-100 dark:bg-gray-800 shadow-sm relative">
+              <img src={selectedTournament.image} alt={selectedTournament.name} className="w-full h-full object-cover" />
+            </div>
+          )}
+
           <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-white leading-tight truncate">
             {selectedTournament.name}
           </h1>
@@ -161,8 +227,25 @@ export default function TournamentDetail() {
               <div>
                 <label className="text-sm font-medium text-gray-500 dark:text-gray-400 block mb-1">Entries</label>
                 <p className="text-2xl font-extrabold text-gray-900 dark:text-white">
-                  {selectedTournament.maxTeams}
+                  {entriesCount} / {selectedTournament.maxTeams}
                 </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400 block mb-1">Bracket</label>
+                {hasBracket ? (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate(`/tournament/${selectedTournament.id}/bracket`)}
+                  >
+                    View bracket & official updates
+                  </Button>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Bracket will appear after admin closes registration.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -174,45 +257,32 @@ export default function TournamentDetail() {
                 </p>
               </div>
 
-              <Button
-                className="w-full mt-2"
-                onClick={() => setShowRegisterModal(true)}
-                disabled={!isRegistrationOpen}
-                variant={isRegistrationOpen ? 'primary' : 'secondary'}
-              >
-                {isRegistrationOpen ? 'Register your team' : 'Registration closed'}
-              </Button>
-            </CardBody>
-          </Card>
-
-          <Card className="p-6">
-            <CardHeader
-              title="Registration Fee"
-              icon="💳"
-              className="pb-4 border-b border-gray-100 dark:border-gray-700 mb-6"
-            />
-            <CardBody className="flex flex-col items-center text-center gap-4">
-              <p className="text-4xl font-extrabold text-primary-600 dark:text-primary-400 leading-none">
-                ₹{selectedTournament.entryFee?.toLocaleString() || '0'}
-              </p>
-
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Secure payment for tournament entry
-              </p>
-
-              {isRegistrationOpen && (
+              {!hasRegistration && (
                 <Button
-                  variant="primary"
-                  className="w-full mt-4"
-                  onClick={() => {/* Handle payment logic */}}
+                  className="w-full mt-2"
+                  onClick={() => setShowRegisterModal(true)}
+                  disabled={!isRegistrationOpen || isTournamentFull}
+                  variant={isRegistrationOpen && !isTournamentFull ? 'primary' : 'secondary'}
                 >
-                  Pay Now
+                  {!isRegistrationOpen
+                    ? 'Registration closed'
+                    : isTournamentFull
+                    ? 'Registration full'
+                    : 'Register your team'}
                 </Button>
               )}
-              {!isRegistrationOpen && (
-                <p className="text-sm text-gray-600 dark:text-gray-400 italic">
-                  Payment option will be available when registration opens.
-                </p>
+
+              {hasRegistration && (
+                <div className="mt-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800 dark:border-green-800 dark:bg-green-900/30 dark:text-green-200">
+                  <div className="font-semibold mb-0.5">You have already registered a team</div>
+                  <div className="opacity-90">
+                    Status: {registrationStatus === 'approved'
+                      ? 'Approved'
+                      : registrationStatus === 'pending'
+                      ? 'Pending admin approval'
+                      : registrationStatus || 'Unknown'}
+                  </div>
+                </div>
               )}
             </CardBody>
           </Card>
@@ -230,6 +300,34 @@ export default function TournamentDetail() {
           onSuccess={() => {
             setShowRegisterModal(false);
             loadTournamentById(selectedTournament.id);
+            // Refresh entries count after a successful registration
+            firestoreService
+              .getTeamRegistrations(selectedTournament.id)
+              .then(regs => {
+                const activeRegs = regs.filter(reg => reg.status !== 'rejected');
+                setEntriesCount(activeRegs.length);
+              })
+              .catch(() => {
+                // Silent fail; counts will refresh on next page load
+              });
+
+            // Refresh current user's registration status
+            if (user) {
+              firestoreService
+                .getUserRegistrationForTournament(selectedTournament.id, user.uid)
+                .then(reg => {
+                  if (reg) {
+                    setHasRegistration(true);
+                    setRegistrationStatus(reg.status);
+                  } else {
+                    setHasRegistration(false);
+                    setRegistrationStatus(null);
+                  }
+                })
+                .catch(() => {
+                  // Ignore errors here; status will be correct on full reload
+                });
+            }
           }}
           onClose={() => setShowRegisterModal(false)}
         />

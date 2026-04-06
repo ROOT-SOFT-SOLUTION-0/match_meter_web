@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Tournament, Match, TeamRegistration, Payment } from '../types/models';
+import { TournamentService } from './tournament.service';
 
 class FirestoreService {
   // ==================== TOURNAMENTS ====================
@@ -54,6 +55,7 @@ class FirestoreService {
     try {
       const docRef = await addDoc(collection(db, 'tournaments'), {
         ...data,
+        totalTeams: data.totalTeams ?? 0,
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       });
@@ -157,6 +159,30 @@ class FirestoreService {
         : null;
     } catch (error) {
       console.error('Error fetching team registration:', error);
+      return null;
+    }
+  }
+
+  async getUserRegistrationForTournament(
+    tournamentId: string,
+    userId: string
+  ): Promise<TeamRegistration | null> {
+    try {
+      const q = query(
+        collection(db, 'tournaments', tournamentId, 'registrations'),
+        where('userId', '==', userId),
+        orderBy('registeredAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return null;
+
+      const docSnap = snapshot.docs[0];
+      return {
+        id: docSnap.id,
+        ...this.convertTimestamps(docSnap.data()),
+      } as TeamRegistration;
+    } catch (error) {
+      console.error('Error fetching user registration for tournament:', error);
       return null;
     }
   }

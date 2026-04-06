@@ -5,6 +5,7 @@ import { InputField } from './InputField';
 import { Tournament, TeamRegistration } from '../types/models';
 import toast from 'react-hot-toast';
 import authService from '../services/auth.service';
+import { useAuth } from '../hooks';
 
 interface RegisterTeamFormProps {
     tournament: Tournament;
@@ -17,6 +18,7 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
     onSuccess,
     onClose,
 }) => {
+    const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         teamName: '',
@@ -80,8 +82,22 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
 
         setLoading(true);
         try {
+            // Enforce tournament team capacity before registering a new team
+            if (tournament.maxTeams && tournament.maxTeams > 0) {
+                const existingRegistrations = await firestoreService.getTeamRegistrations(tournament.id);
+                const activeRegistrations = existingRegistrations.filter(
+                    (reg) => reg.status !== 'rejected'
+                );
+
+                if (activeRegistrations.length >= tournament.maxTeams) {
+                    toast.error('This tournament has reached its maximum team capacity.');
+                    return;
+                }
+            }
+
             const registrationData: Partial<TeamRegistration> = {
                 tournamentId: tournament.id,
+                userId: user?.uid || '',
                 teamName: formData.teamName,
                 captain: formData.captainName,
                 captainEmail: formData.captainEmail,
@@ -106,7 +122,7 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
                 registrationData
             );
 
-            toast.success('Registration submitted! Please proceed to payment.');
+            toast.success('Registration submitted! Awaiting admin approval.');
             onSuccess?.(registrationId);
         } catch (error) {
             console.error('Error registering team:', error);
@@ -324,6 +340,22 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
                 </div>
 
                 <div className="pt-6">
+                    {tournament.entryFee > 0 && tournament.paymentQrCode && (
+                        <div className="mb-6 p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50 flex flex-col items-center text-center">
+                            <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                                Entry Fee: ₹{tournament.entryFee} {tournament.currency}
+                            </h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                                Scan the QR code using GPay or any UPI app to pay the registration fee.
+                                After paying, submit this form. The admin will verify your payment manually.
+                            </p>
+                            <img 
+                                src={tournament.paymentQrCode} 
+                                alt="Payment QR Code" 
+                                className="w-48 h-48 object-contain bg-white p-2 rounded-lg shadow-sm border border-gray-200"
+                            />
+                        </div>
+                    )}
                     <Button
                         type="submit"
                         isLoading={loading}
@@ -331,9 +363,11 @@ export const RegisterTeamForm: React.FC<RegisterTeamFormProps> = ({
                     >
                         Submit Registration
                     </Button>
-                    <p className="text-center text-xs text-gray-400 mt-3 italic">
-                        Entry Fee: ₹{tournament.entryFee} {tournament.currency}
-                    </p>
+                    {(!tournament.paymentQrCode || tournament.entryFee === 0) && (
+                        <p className="text-center text-xs text-gray-400 mt-3 italic">
+                            Entry Fee: ₹{tournament.entryFee} {tournament.currency}
+                        </p>
+                    )}
                 </div>
             </form>
         </div>

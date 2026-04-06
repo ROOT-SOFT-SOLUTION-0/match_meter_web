@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { TournamentService } from '../services/tournament.service';
+import paymentService from '../services/payment.service';
+import adminService from '../services/admin.service';
 import { Button } from './Button';
 import { InputField, Select } from './InputField';
 import { Card } from './Card';
@@ -37,6 +39,24 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
 
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [tournamentFee, setTournamentFee] = useState<number>(199);
+
+  // Load current tournament creation fee from global pricing config
+  useEffect(() => {
+    const loadFee = async () => {
+      try {
+        const config = await adminService.getPricingConfig();
+        if (config?.tournamentCreationFee) {
+          setTournamentFee(config.tournamentCreationFee);
+        }
+      } catch (error) {
+        // Fail silently and keep default fee
+        console.error('Failed to load tournament fee config:', error);
+      }
+    };
+
+    loadFee();
+  }, []);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -51,6 +71,7 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
     registrationDeadline: '',
     bracketFormat: 'single_elimination' as const,
     image: '',
+    paymentQrCode: '',
     highlightVideoUrl: '',
   });
 
@@ -140,37 +161,67 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
       registrationDeadline: registrationDeadlineStr,
     }));
 
-    setLoading(true);
-    try {
-      const tournamentId = await TournamentService.createTournament(
-        {
-          name,
-          description: formData.description,
-          sport,
-          location,
-          maxTeams: formData.maxTeams,
-          entryFee: formData.entryFee,
-          currency: formData.currency,
-          startDate: startTime,
-          endDate: endTime,
-          registrationDeadline: regDeadline,
-          bracketFormat: formData.bracketFormat,
-          maxPlayersPerTeam: formData.maxPlayersPerTeam,
-          image: formData.image || '',
-          highlightVideoUrl: formData.highlightVideoUrl || '',
-          rules: '',
-          schedule: '',
-        },
-        user.uid
-      );
+    const email = user.email;
+    const phone = user.phone || '';
 
-      toast.success('Tournament created successfully!');
-      onSuccess?.(tournamentId);
-      onClose?.();
+    if (!email) {
+      toast.error('Your account does not have an email set');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await paymentService.initiateTournamentCreationPayment(
+        tournamentFee,
+        email,
+        phone,
+        async () => {
+          try {
+            const tournamentId = await TournamentService.createTournament(
+              {
+                name,
+                description: formData.description,
+                sport,
+                location,
+                maxTeams: formData.maxTeams,
+                entryFee: formData.entryFee,
+                currency: formData.currency,
+                startDate: startTime,
+                endDate: endTime,
+                registrationDeadline: regDeadline,
+                bracketFormat: formData.bracketFormat,
+                maxPlayersPerTeam: formData.maxPlayersPerTeam,
+                image: formData.image || '',
+                paymentQrCode: formData.paymentQrCode || '',
+                highlightVideoUrl: formData.highlightVideoUrl || '',
+                rules: '',
+                schedule: '',
+              },
+              user.uid
+            );
+
+            toast.success('Tournament created successfully!');
+            onSuccess?.(tournamentId);
+            onClose?.();
+          } catch (error) {
+            console.error('Error creating tournament after successful payment:', error);
+            toast.error(
+              'Payment succeeded, but tournament could not be created. Please contact support.'
+            );
+          } finally {
+            setLoading(false);
+          }
+        },
+        (errorMessage) => {
+          console.error('Tournament creation payment failed:', errorMessage);
+          toast.error(errorMessage || 'Payment failed. Tournament not created.');
+          setLoading(false);
+        }
+      );
     } catch (error) {
-      console.error('Error creating tournament:', error);
-      toast.error('Failed to create tournament');
-    } finally {
+      console.error('Error initiating tournament creation payment:', error);
+      toast.error('Could not start payment. Please try again.');
       setLoading(false);
     }
   };
@@ -328,7 +379,30 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
             />
           </div>
 
-          <div className="space-y-2">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Payment QR Code
+            </label>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              Upload your GPay/UPI QR code for teams to pay registration fees.
+            </p>
+            <ImageUploader
+              folder="tournaments/qr"
+              onSuccess={(url) => {
+                setFormData((prev) => ({ ...prev, paymentQrCode: url }));
+                toast.success('QR Code uploaded snippet');
+              }}
+              onError={(error) => toast.error(error)}
+              disabled={loading}
+            />
+            {formData.paymentQrCode && (
+              <a href={formData.paymentQrCode} target="_blank" rel="noopener noreferrer" className="text-primary text-xs mt-2 block underline">
+                View Uploaded QR Code
+              </a>
+            )}
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
             <InputField
               label="Highlight video URL"
               name="highlightVideoUrl"
@@ -343,13 +417,13 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-4 pt-6">
+        <div className="flex flex-col md:flex-row gap-4 pt-6">
           <Button
             type="submit"
             isLoading={loading}
             className="flex-1"
           >
-            Create Tournament
+            Pay ₹{tournamentFee} &amp; Create Tournament
           </Button>
           {onClose && (
             <Button

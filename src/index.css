@@ -207,6 +207,17 @@ textarea::placeholder {
   }
 }
 
+@keyframes bracketNodeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .animate-pulse {
   animation: shimmer 2s infinite;
   background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-secondary) 50%, var(--bg-tertiary) 75%);
@@ -220,6 +231,27 @@ textarea::placeholder {
 .animate-slide-down {
   animation: slideDown 0.3s ease-out;
 }
+
+.bracket-node-enter {
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  animation: bracketNodeIn 0.35s ease-out forwards;
+}
+
+/* Bracket connection lines - handled by canvas component now */
+.bracket-column {
+  position: relative;
+}
+
+.bracket-card {
+  position: relative;
+}
+
+.bracket-pair {
+  position: relative;
+}
+
+/* CSS-based connectors disabled - using canvas instead */
 
 /* ===== Component Styles ===== */
 @layer components {

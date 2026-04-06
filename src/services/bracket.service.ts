@@ -109,17 +109,15 @@ export class BracketService {
       const team2 = seededTeams[i + 1];
 
       const matchId = `${tournamentId}_r1_m${matchCount + 1}`;
-      const match: BracketMatch = {
+
+      // Build match object without undefined fields (Firestore rejects undefined)
+      const match: any = {
         id: matchId,
         tournamentId,
         round: 1,
         position: matchCount + 1,
         team1Id: team1.id,
         team1Name: team1.teamName,
-        team1Logo: team1.teamLogo,
-        team2Id: team2?.id,
-        team2Name: team2?.teamName,
-        team2Logo: team2?.teamLogo,
         status: team2 ? 'pending' : 'bye',
         matchNumber: matchCount + 1,
         bracketType: 'winners',
@@ -127,8 +125,20 @@ export class BracketService {
         updatedAt: Timestamp.now().toMillis(),
       };
 
+      if (team1.teamLogo) {
+        match.team1Logo = team1.teamLogo;
+      }
+
+      if (team2) {
+        match.team2Id = team2.id;
+        match.team2Name = team2.teamName;
+        if (team2.teamLogo) {
+          match.team2Logo = team2.teamLogo;
+        }
+      }
+
       matchesByRound[1] = matchesByRound[1] || [];
-      matchesByRound[1].push(match);
+      matchesByRound[1].push(match as BracketMatch);
       matchIds.push(matchId);
       batch.set(doc(db, 'bracket_matches', matchId), match);
       matchCount++;
@@ -490,11 +500,10 @@ export class BracketService {
     teamLogo?: string
   ): Promise<string> {
     try {
-      const docRef = await addDoc(collection(db, 'bracket_teams'), {
+      const data: BracketTeam = {
         tournamentId,
         registrationId,
         teamName,
-        teamLogo,
         captainId,
         captainName,
         members,
@@ -503,7 +512,14 @@ export class BracketService {
         losses: 0,
         createdAt: Timestamp.now().toMillis(),
         updatedAt: Timestamp.now().toMillis(),
-      } as BracketTeam);
+      } as BracketTeam;
+
+      // Firestore does not allow undefined values; only add teamLogo when present
+      if (teamLogo) {
+        (data as any).teamLogo = teamLogo;
+      }
+
+      const docRef = await addDoc(collection(db, 'bracket_teams'), data);
 
       return docRef.id;
     } catch (error) {

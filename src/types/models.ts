@@ -35,6 +35,7 @@ export interface Tournament {
   entryFee: number;
   currency: string;
   image?: string;
+  paymentQrCode?: string;
   // Optional highlight / promo video for feed (YouTube Shorts, Drive, etc.)
   highlightVideoUrl?: string;
   createdBy: string;
@@ -70,6 +71,7 @@ export interface Match {
 export interface TeamRegistration {
   id: string;
   tournamentId: string;
+  userId: string;
   teamName: string;
   teamLogo?: string;
   captain: string;

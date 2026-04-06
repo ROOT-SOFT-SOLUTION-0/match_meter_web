@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, CardBody, CardHeader } from '../components';
+import { Card, CardBody, CardHeader, InputField, Button } from '../components';
 import { useUIStore } from '../store';
 import adminService from '../services/admin.service';
 import streamRequestService from '../services/stream-request.service';
@@ -22,6 +22,9 @@ export default function SuperAdmin() {
     tournaments: 0,
   });
   const [loading, setLoading] = useState<boolean>(true);
+  const [pricingLoading, setPricingLoading] = useState<boolean>(true);
+  const [tournamentCreationFee, setTournamentCreationFee] = useState<number>(199);
+  const [savingPricing, setSavingPricing] = useState<boolean>(false);
   const showError = useUIStore((state) => state.showError);
 
   useEffect(() => {
@@ -56,6 +59,27 @@ export default function SuperAdmin() {
     };
 
     loadStats();
+  }, [showError]);
+
+  // Load pricing configuration for super admin controls
+  useEffect(() => {
+    const loadPricing = async () => {
+      try {
+        setPricingLoading(true);
+        const config = await adminService.getPricingConfig();
+        if (config?.tournamentCreationFee) {
+          setTournamentCreationFee(config.tournamentCreationFee);
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Failed to load pricing config';
+        showError(message);
+      } finally {
+        setPricingLoading(false);
+      }
+    };
+
+    loadPricing();
   }, [showError]);
 
   const modules = [
@@ -145,6 +169,54 @@ export default function SuperAdmin() {
               {loading ? '...' : stats.tournaments}
             </div>
             <div className="text-xs font-medium text-gray-500 mt-1 uppercase tracking-wider">Tournaments</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-white dark:bg-gray-800/80 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">💰 Pricing Controls</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 max-w-xl">
+          Set how much admins pay each time they create a tournament. This amount
+          is charged during the "Pay &amp; Create Tournament" flow.
+        </p>
+
+        <div className="max-w-sm flex flex-col sm:flex-row items-stretch gap-3">
+          <div className="flex-1">
+            <InputField
+              label="Tournament creation fee (₹)"
+              name="tournamentCreationFee"
+              type="number"
+              min={0}
+              value={tournamentCreationFee}
+              onChange={(e: any) => {
+                const value = parseInt(e.target.value, 10);
+                setTournamentCreationFee(Number.isNaN(value) ? 0 : value);
+              }}
+              helperText={pricingLoading ? 'Loading current value…' : 'Minimum 0. Example: 199'}
+            />
+          </div>
+          <div className="self-end pb-1">
+            <Button
+              type="button"
+              onClick={async () => {
+                if (tournamentCreationFee < 0) return;
+                try {
+                  setSavingPricing(true);
+                  await adminService.updatePricingConfig(tournamentCreationFee);
+                } catch (error) {
+                  const message =
+                    error instanceof Error
+                      ? error.message
+                      : 'Failed to update pricing';
+                  showError(message);
+                } finally {
+                  setSavingPricing(false);
+                }
+              }}
+              isLoading={savingPricing}
+            >
+              Save
+            </Button>
           </div>
         </div>
       </section>

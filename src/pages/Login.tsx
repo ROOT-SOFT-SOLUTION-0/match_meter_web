@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks';
 import { Button, InputField } from '../components';
@@ -13,13 +13,24 @@ const getLandingRouteByRole = (role?: 'user' | 'admin' | 'super_admin') => {
 
 export default function Login() {
   const navigate = useNavigate();
-  const { signIn, signInWithGoogle, loading, error } = useAuth();
+  const { user, signIn, signInWithGoogle, loading, error } = useAuth();
   const showError = useUIStore((state) => state.showError);
   const showSuccess = useUIStore((state) => state.showSuccess);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (loading) return;
+    if (user) {
+      navigate(getLandingRouteByRole(user.role), { replace: true });
+    }
+  }, [loading, user, navigate]);
+
+  if (!loading && user) {
+    return null;
+  }
 
   const validateForm = () => {
     const errors: Record<string, string> = {};

@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TournamentService } from '../services/tournament.service';
 import { BracketService } from '../services/bracket.service';
-import { Tournament, BracketTeam, BracketMatch } from '../types/models';
+import { Tournament, BracketTeam, BracketMatch, TeamRegistration } from '../types/models';
+import firestoreService from '../services/firestore.service';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Loading } from '../components/Loading';
@@ -20,8 +21,8 @@ interface BracketPreview {
   round: number;
   matches: Array<{
     matchNum: number;
-    team1?: BracketTeam;
-    team2?: BracketTeam;
+    team1?: TeamRegistration | BracketTeam;
+    team2?: TeamRegistration | BracketTeam;
     isBye?: boolean;
   }>;
 }
@@ -31,7 +32,7 @@ export const AdminTournamentWorkflow: React.FC = () => {
   const navigate = useNavigate();
 
   const [tournament, setTournament] = useState<Tournament | null>(null);
-  const [registeredTeams, setRegisteredTeams] = useState<BracketTeam[]>([]);
+  const [registeredTeams, setRegisteredTeams] = useState<TeamRegistration[]>([]);
   const [bracket, setBracket] = useState<BracketMatch[]>([]);
   const [currentStep, setCurrentStep] = useState<WorkflowStep>('details');
   const [loading, setLoading] = useState(true);
@@ -49,24 +50,31 @@ export const AdminTournamentWorkflow: React.FC = () => {
     }
   }, [tournamentId]);
 
-  const loadTournamentData = async () => {
+  const loadTournamentData = async (options?: { keepStep?: boolean }) => {
     try {
       setLoading(true);
       const [tourData, teamsData] = await Promise.all([
         TournamentService.getTournament(tournamentId!),
-        BracketService.getRegisteredTeams(tournamentId!),
+        firestoreService.getTeamRegistrations(tournamentId!),
       ]);
 
       setTournament(tourData);
       setRegisteredTeams(teamsData);
 
-      // Determine current workflow step
-      if (tourData?.status === 'active') {
+      // Determine current workflow step unless caller wants to keep it
+      if (!options?.keepStep) {
+        if (tourData?.status === 'active') {
+          setCurrentStep('active');
+          const bracketData = await BracketService.getBracket(tournamentId!);
+          setBracket(bracketData);
+        } else if (tourData?.status === 'draft') {
+          setCurrentStep('registration');
+        }
+      } else if (options.keepStep && tourData?.status === 'active') {
+        // Even when keeping step, ensure we move to active if tournament is live
         setCurrentStep('active');
         const bracketData = await BracketService.getBracket(tournamentId!);
         setBracket(bracketData);
-      } else if (tourData?.status === 'draft') {
-        setCurrentStep('registration');
       }
     } catch (error) {
       console.error('Error loading tournament:', error);
@@ -77,7 +85,9 @@ export const AdminTournamentWorkflow: React.FC = () => {
   };
 
   const handleCloseRegistration = async () => {
-    if (!tournament || registeredTeams.length < 2) {
+    // Only proceed if we have enough active (non-rejected) teams
+    const activeTeams = registeredTeams.filter(t => t.status !== 'rejected');
+    if (!tournament || activeTeams.length < 2) {
       toast.error('Need at least 2 teams to close registration');
       return;
     }
@@ -86,8 +96,9 @@ export const AdminTournamentWorkflow: React.FC = () => {
       setLoading(true);
       await TournamentService.updateTournamentStatus(tournament.id, 'draft');
       setCurrentStep('bracket-generation');
-      toast.success('Registration closed');
-      loadTournamentData();
+      toast.success('Registration closed and ready for bracket generation');
+      // Refresh data but keep the user on the bracket-generation step
+      loadTournamentData({ keepStep: true });
     } catch (error) {
       console.error('Error closing registration:', error);
       toast.error('Failed to close registration');
@@ -96,16 +107,65 @@ export const AdminTournamentWorkflow: React.FC = () => {
     }
   };
 
-  const generateBracketPreview = () => {
-    if (registeredTeams.length === 0) return;
+  const handleApproveRegistration = async (registrationId: string) => {
+    try {
+      setLoading(true);
+      await firestoreService.updateTeamRegistration(tournamentId!, registrationId, {
+        status: 'approved',
+      });
+      toast.success('Registration approved');
+      await loadTournamentData();
+    } catch (error) {
+      console.error('Error approving registration:', error);
+      toast.error('Failed to approve registration');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const totalTeams = registeredTeams.length;
+  const handleRejectRegistration = async (registrationId: string) => {
+    try {
+      setLoading(true);
+      await firestoreService.updateTeamRegistration(tournamentId!, registrationId, {
+        status: 'rejected',
+      });
+      toast.success('Registration rejected');
+      await loadTournamentData();
+    } catch (error) {
+      console.error('Error rejecting registration:', error);
+      toast.error('Failed to reject registration');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMarkPaymentCompleted = async (registrationId: string) => {
+    try {
+      setLoading(true);
+      await firestoreService.updateTeamRegistration(tournamentId!, registrationId, {
+        paymentStatus: 'completed',
+      });
+      toast.success('Marked as paid');
+      await loadTournamentData();
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      toast.error('Failed to update payment status');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateBracketPreview = () => {
+    const eligibleTeams = registeredTeams.filter(t => t.status !== 'rejected');
+    if (eligibleTeams.length === 0) return;
+
+    const totalTeams = eligibleTeams.length;
     const nextPowerOfTwo = Math.pow(2, Math.ceil(Math.log2(totalTeams)));
     const byesNeeded = nextPowerOfTwo - totalTeams;
     const firstRoundMatches = (nextPowerOfTwo - byesNeeded) / 2;
 
     // Seed teams based on seeding mode
-    let seededTeams = [...registeredTeams];
+    let seededTeams = [...eligibleTeams];
     if (seedingMode === 'random') {
       seededTeams = seededTeams.sort(() => Math.random() - 0.5);
     } else if (seedingMode === 'ranking') {
@@ -160,23 +220,24 @@ export const AdminTournamentWorkflow: React.FC = () => {
   };
 
   const handleGenerateBracket = async () => {
-    if (!tournament || registeredTeams.length < 2) {
-      toast.error('Need at least 2 teams');
+    const eligibleTeams = registeredTeams.filter(t => t.status !== 'rejected');
+    if (!tournament || eligibleTeams.length < 2) {
+      toast.error('Need at least 2 teams to generate a bracket');
       return;
     }
 
     try {
       setLoading(true);
 
-      // First register all teams in bracket_teams collection
-      for (const team of registeredTeams) {
+      // First register all approved teams in bracket_teams collection
+      for (const team of eligibleTeams) {
         await BracketService.registerTeamForBracket(
           tournament.id,
-          team.registrationId,
+          team.id,
           team.teamName,
-          team.captainId,
-          team.captainName,
-          team.members,
+          team.userId || '',
+          team.captain,
+          team.players,
           team.teamLogo
         );
       }
@@ -192,6 +253,7 @@ export const AdminTournamentWorkflow: React.FC = () => {
       setBracket(generatedBracket);
 
       setCurrentStep('review-fixtures');
+      setShowPreview(false);
       toast.success(
         `Bracket generated with ${result.matchesCreated} matches!`
       );
@@ -277,10 +339,11 @@ export const AdminTournamentWorkflow: React.FC = () => {
         <Card className="p-6">
           <h2 className="text-2xl font-bold mb-4">Team Registrations</h2>
           <div className="space-y-4">
-            <div className="grid grid-cols-4 gap-4 text-sm font-semibold">
+            <div className="grid grid-cols-5 gap-4 text-sm font-semibold">
               <div>Team Name</div>
               <div>Captain</div>
               <div>Members</div>
+              <div>Payment</div>
               <div>Status</div>
             </div>
 
@@ -292,15 +355,55 @@ export const AdminTournamentWorkflow: React.FC = () => {
               registeredTeams.map((team) => (
                 <div
                   key={team.id}
-                  className="grid grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg items-center"
+                  className="grid grid-cols-5 gap-4 p-4 bg-gray-50 rounded-lg items-center"
                 >
                   <div className="font-semibold">{team.teamName}</div>
-                  <div>{team.captainName}</div>
+                  <div>{team.captain}</div>
                   <div>{team.totalMembers} members</div>
-                  <div>
-                    <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
-                      ✓ Approved
-                    </span>
+                  <div className="flex items-center gap-2">
+                    {team.paymentStatus === 'completed' ? (
+                      <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
+                        Paid
+                      </span>
+                    ) : (
+                      <>
+                        <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm">
+                          Not paid
+                        </span>
+                        <button
+                          onClick={() => handleMarkPaymentCompleted(team.id)}
+                          className="text-xs text-blue-600 hover:text-blue-700 underline"
+                        >
+                          Mark as paid
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    {team.status === 'approved' ? (
+                      <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
+                        ✓ Approved
+                      </span>
+                    ) : team.status === 'rejected' ? (
+                      <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm">
+                        ✕ Rejected
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleApproveRegistration(team.id)}
+                          className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-sm"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleRejectRegistration(team.id)}
+                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm"
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))
@@ -308,8 +411,8 @@ export const AdminTournamentWorkflow: React.FC = () => {
 
             <div className="bg-blue-50 p-4 rounded-lg mt-4">
               <p className="text-sm text-gray-700">
-                <strong>Total Registered:</strong> {registeredTeams.length}{' '}
-                teams
+                <strong>Total Registered (active):</strong>{' '}
+                {registeredTeams.filter(t => t.status !== 'rejected').length} teams
               </p>
               <p className="text-sm text-gray-700">
                 <strong>Max Capacity:</strong> {tournament?.maxTeams} teams
@@ -338,18 +441,18 @@ export const AdminTournamentWorkflow: React.FC = () => {
             {/* Info Box */}
             <div className="bg-blue-50 p-4 rounded-lg">
               <p className="text-sm text-gray-700 mb-2">
-                <strong>Teams:</strong> {registeredTeams.length}
+                <strong>Approved Teams:</strong> {registeredTeams.filter(t => t.status === 'approved').length}
               </p>
               <p className="text-sm text-gray-700">
-                <strong>Bracket Size:</strong> {Math.pow(
+                <strong>Bracket Size:</strong> {registeredTeams.filter(t => t.status === 'approved').length > 0 ? Math.pow(
                   2,
-                  Math.ceil(Math.log2(registeredTeams.length))
-                )}{' '}
+                  Math.ceil(Math.log2(registeredTeams.filter(t => t.status === 'approved').length))
+                ) : 0}{' '}
                 (with{' '}
-                {Math.pow(
+                {registeredTeams.filter(t => t.status === 'approved').length > 0 ? Math.pow(
                   2,
-                  Math.ceil(Math.log2(registeredTeams.length))
-                ) - registeredTeams.length}{' '}
+                  Math.ceil(Math.log2(registeredTeams.filter(t => t.status === 'approved').length))
+                ) - registeredTeams.filter(t => t.status === 'approved').length : 0}{' '}
                 byes)
               </p>
             </div>
@@ -501,13 +604,13 @@ export const AdminTournamentWorkflow: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <p className="font-semibold">
-                              {match.team1Name || 'TBD'}
+                              {match.team1Name || ''}
                             </p>
                           </div>
                           <div className="px-4 text-center font-bold">vs</div>
                           <div className="flex-1 text-right">
                             <p className="font-semibold">
-                              {match.team2Name || 'TBD'}
+                              {match.team2Name || ''}
                             </p>
                           </div>
                         </div>

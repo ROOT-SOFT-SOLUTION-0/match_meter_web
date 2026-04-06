@@ -147,7 +147,6 @@ service cloud.firestore {
       allow create, update, delete: if isSuperAdmin();
     }
 
-    // Tournament Bracket Rules
     match /tournaments/{tournamentId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && (
@@ -163,6 +162,16 @@ service cloud.firestore {
         isSuperAdmin()
       );
       allow delete: if isSuperAdmin();
+
+      match /registrations/{registrationId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update: if isSignedIn() && (
+          resource.data.userId == request.auth.uid ||
+          isAdminOrSuperAdmin()
+        );
+        allow delete: if isAdminOrSuperAdmin();
+      }
     }
 
     match /tournament_configs/{configId} {

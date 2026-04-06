@@ -78,7 +78,12 @@ export default function Tournaments() {
 
             return (
             <Link key={tournament.id} to={`/tournaments/${tournament.id}`}>
-              <Card hoverable className="h-full cursor-pointer">
+              <Card hoverable className="h-full cursor-pointer overflow-hidden">
+                {tournament.image && (
+                  <div className="w-full h-48 bg-gray-200 dark:bg-gray-800">
+                    <img src={tournament.image} alt={tournament.name} className="w-full h-full object-cover" />
+                  </div>
+                )}
                 <CardHeader
                   title={tournament.name}
                   subtitle={tournament.sport}

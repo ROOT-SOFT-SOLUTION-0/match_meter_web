@@ -92,6 +92,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       )}
 
       <Button
+        type="button"
         onClick={() => inputRef.current?.click()}
         disabled={disabled || uploading}
         isLoading={uploading}

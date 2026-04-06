@@ -108,6 +108,63 @@ class PaymentService {
     }
   }
 
+  /**
+   * Generic payment flow to charge an admin for creating a tournament.
+   * Currently used for a fixed ₹199 tournament creation fee.
+   */
+  async initiateTournamentCreationPayment(
+    amount: number,
+    email: string,
+    phone: string,
+    onSuccess: (paymentId: string, orderId: string) => void,
+    onError: (error: string) => void
+  ): Promise<void> {
+    try {
+      if (!this.razorpayLoaded) {
+        const loaded = await this.loadRazorpayScript();
+        if (!loaded) {
+          throw new Error('Failed to load payment service');
+        }
+      }
+
+      const orderId = `order_tournament_${Date.now()}`;
+
+      const options: RazorpayOptions = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'test_key',
+        amount: Math.round(amount * 100),
+        currency: 'INR',
+        name: 'MATCHMETER',
+        description: 'Tournament Creation Fee',
+        order_id: orderId,
+        prefill: { email, contact: phone },
+        handler: (response: any) => {
+          console.log('✓ Tournament creation payment successful:', response);
+          onSuccess(response.razorpay_payment_id, orderId);
+        },
+        modal: {
+          ondismiss: () => {
+            onError('Payment cancelled by user');
+          },
+        },
+        theme: {
+          color: '#2196F3',
+        },
+      };
+
+      if (window.Razorpay) {
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+      } else {
+        throw new Error('Razorpay not available');
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Payment initiation failed';
+      console.error('Tournament creation payment error:', error);
+      onError(errorMessage);
+    }
+  }
+
   async verifyPayment(
     paymentId: string,
     orderId: string,

@@ -22,12 +22,24 @@ const buildEmbedUrl = (raw: string): string => {
 
     // YouTube regular + Shorts + youtu.be
     if (host.includes('youtube.com')) {
-      const videoId = url.searchParams.get('v') || url.pathname.split('/').filter(Boolean).pop();
+      let videoId = url.searchParams.get('v');
+      
+      // Handle youtube.com/shorts/VIDEO_ID
+      if (!videoId && url.pathname.includes('/shorts/')) {
+        videoId = url.pathname.split('/shorts/')[1].split('/')[0];
+      } else if (!videoId) {
+        videoId = url.pathname.split('/').filter(Boolean).pop();
+      }
+
       if (videoId) {
-        return `https://www.youtube.com/embed/${videoId}`;
+        return `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
       }
     }
     if (host === 'youtu.be') {
+      const videoId = url.pathname.slice(1);
+      if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
+      }
       const videoId = url.pathname.split('/').filter(Boolean).pop();
       if (videoId) {
         return `https://www.youtube.com/embed/${videoId}`;
@@ -134,11 +146,17 @@ export default function Feed() {
             </div>
 
             {t.highlightVideoUrl && (
-              <div className="mt-1">
-                <div className="w-full aspect-video bg-black flex items-center justify-center">
+              <div className="mt-2 flex justify-center w-full bg-black/5 dark:bg-black/20">
+                <div 
+                  className={`w-full relative ${
+                    t.highlightVideoUrl.includes('shorts') || t.highlightVideoUrl.includes('tiktok') || t.highlightVideoUrl.includes('instagram') 
+                      ? 'aspect-[9/16] max-w-[400px] mx-auto rounded-xl overflow-hidden shadow-sm' 
+                      : 'aspect-video'
+                  } bg-black flex items-center justify-center`}
+                >
                   <iframe
                     src={buildEmbedUrl(t.highlightVideoUrl)}
-                    className="w-full h-full border-0"
+                    className="absolute top-0 left-0 w-full h-full border-0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
                     title={`Highlight for ${t.name}`}

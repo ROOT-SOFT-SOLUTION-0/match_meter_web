@@ -223,8 +223,10 @@ export class TournamentService {
       }
 
       const tournament = tourSnap.data() as Tournament;
+      const currentTotal =
+        typeof tournament.totalTeams === 'number' ? tournament.totalTeams : 0;
       await updateDoc(tourRef, {
-        totalTeams: tournament.totalTeams + 1,
+        totalTeams: currentTotal + 1,
         updatedAt: Timestamp.now().toMillis(),
       });
     } catch (error) {
