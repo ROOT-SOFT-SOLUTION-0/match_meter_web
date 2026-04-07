@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTournamentStore } from '../store';
 import { Card, CardHeader, CardBody, Button, Loading, Modal } from '../components';
@@ -6,6 +6,7 @@ import { RegisterTeamForm } from '../components/RegisterTeamForm';
 import { useAuth } from '../hooks';
 import firestoreService from '../services/firestore.service';
 import { BracketService } from '../services/bracket.service';
+import { MetaTags } from '../components/MetaTags';
 
 export default function TournamentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -93,8 +94,86 @@ export default function TournamentDetail() {
   const dateRange = `${formatDate(selectedTournament.startDate)} 
   – ${formatDate(selectedTournament.endDate)}`;
 
+  const metaConfig = useMemo(() => {
+    const baseUrl = 'https://your-domain.com';
+    const url = `${baseUrl}/tournaments/${selectedTournament.id}`;
+    const title = `${selectedTournament.name} | MatchMeter`;
+    const description =
+      selectedTournament.description ||
+      `Join ${selectedTournament.name}, a ${selectedTournament.sport} tournament in ${selectedTournament.location}.`;
+
+    const image = selectedTournament.image || '/assets/icon/icon-512x512.png';
+
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        url,
+        image,
+        type: 'event',
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title,
+        description,
+        image,
+      },
+      canonicalUrl: url,
+    } as const;
+  }, [selectedTournament]);
+
+  const eventJsonLd = useMemo(() => {
+    const startDateIso = new Date(selectedTournament.startDate).toISOString();
+    const endDateIso = new Date(selectedTournament.endDate).toISOString();
+    const baseUrl = 'https://your-domain.com';
+
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'SportsEvent',
+      name: selectedTournament.name,
+      description:
+        selectedTournament.description ||
+        `Sports tournament for ${selectedTournament.sport} in ${selectedTournament.location}.`,
+      sport: selectedTournament.sport,
+      startDate: startDateIso,
+      endDate: endDateIso,
+      eventStatus:
+        selectedTournament.status === 'completed'
+          ? 'https://schema.org/EventCompleted'
+          : selectedTournament.status === 'active'
+          ? 'https://schema.org/EventInProgress'
+          : 'https://schema.org/EventScheduled',
+      location: {
+        '@type': 'Place',
+        name: selectedTournament.location,
+      },
+      organizer: {
+        '@type': 'Organization',
+        name: 'MatchMeter',
+      },
+      url: `${baseUrl}/tournaments/${selectedTournament.id}`,
+      image: selectedTournament.image ? [selectedTournament.image] : undefined,
+      offers:
+        typeof selectedTournament.entryFee === 'number'
+          ? {
+              '@type': 'Offer',
+              price: selectedTournament.entryFee,
+              priceCurrency: selectedTournament.currency || 'INR',
+              availability: 'https://schema.org/InStock',
+            }
+          : undefined,
+    };
+  }, [selectedTournament]);
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+      <MetaTags config={metaConfig} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd) }}
+      />
       <div className="mb-6 flex flex-col gap-4">
         <div className="min-w-0 w-full">
           <button

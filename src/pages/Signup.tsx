@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks';
 import { Button, Card, CardBody, InputField } from '../components';
 import { useUIStore } from '../store';
+import { MetaTags } from '../components/MetaTags';
+import { getRouteMeta } from '../seo/routeMeta';
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -85,6 +87,7 @@ export default function Signup() {
 
   return (
     <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center bg-secondary-50 dark:bg-secondary-950 px-4 py-6 sm:py-8 overflow-hidden">
+      <MetaTags config={getRouteMeta('/signup')} />
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.03]"
         style={{

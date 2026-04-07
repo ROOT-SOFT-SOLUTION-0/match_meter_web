@@ -3,6 +3,8 @@ import { useTournamentStore } from '../store';
 import { useAuth } from '../hooks';
 import { Card, CardHeader, CardBody, Loading, Button } from '../components';
 import { Link } from 'react-router-dom';
+import { MetaTags } from '../components/MetaTags';
+import { getRouteMeta } from '../seo/routeMeta';
 
 export default function Tournaments() {
   const { user } = useAuth();
@@ -31,6 +33,7 @@ export default function Tournaments() {
 
   return (
     <div className="space-y-6">
+      <MetaTags config={getRouteMeta('/tournaments')} />
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
