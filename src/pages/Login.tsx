@@ -4,6 +4,8 @@ import { useAuth } from '../hooks';
 import { Button, InputField } from '../components';
 import { useUIStore } from '../store';
 import authService from '../services/auth.service';
+import { MetaTags } from '../components/MetaTags';
+import { getRouteMeta } from '../seo/routeMeta';
 
 const getLandingRouteByRole = (role?: 'user' | 'admin' | 'super_admin') => {
   if (role === 'super_admin') return '/super-admin';
@@ -83,6 +85,7 @@ export default function Login() {
 
   return (
     <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center overflow-hidden bg-secondary-50 dark:bg-secondary-950 px-4 py-6 sm:py-8">
+      <MetaTags config={getRouteMeta('/login')} />
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.03]"
         style={{

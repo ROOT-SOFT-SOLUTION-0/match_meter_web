@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks';
 import { Button, Card, CardBody, Badge } from '../components';
+import { MetaTags } from '../components/MetaTags';
+import { getRouteMeta } from '../seo/routeMeta';
 import {
   Activity,
   Calendar,
@@ -218,6 +220,7 @@ function LandingPage() {
       </div>
 
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-20 sm:pt-24 sm:pb-28 text-center space-y-8">
+        <MetaTags config={getRouteMeta('/')} />
         <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-medium text-emerald-700">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
           The athlete's tournament OS

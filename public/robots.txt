@@ -1,0 +1,10 @@
+User-agent: *
+Disallow: /admin
+Disallow: /super-admin
+Disallow: /create-tournament
+Disallow: /player
+Disallow: /profile
+Disallow: /settings
+Disallow: /my-teams
+
+Sitemap: https://your-domain.com/sitemap.xml

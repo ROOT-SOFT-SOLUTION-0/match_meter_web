@@ -1,9 +1,12 @@
 import { Link } from 'react-router-dom';
 import { Button } from '../components';
+import { MetaTags } from '../components/MetaTags';
+import { getRouteMeta } from '../seo/routeMeta';
 
 export default function NotFound() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] gap-8">
+      <MetaTags config={getRouteMeta('/404')} />
       <div className="text-6xl font-bold text-primary">404</div>
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Page Not Found</h1>
