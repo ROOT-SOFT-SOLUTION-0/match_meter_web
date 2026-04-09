@@ -147,6 +147,14 @@ service cloud.firestore {
       allow create, update, delete: if isSuperAdmin();
     }
 
+    // Global application configuration (e.g., pricing).
+    // Super admin can manage these settings; all signed-in users can read.
+    match /app_config/{configId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
     match /tournaments/{tournamentId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && (
