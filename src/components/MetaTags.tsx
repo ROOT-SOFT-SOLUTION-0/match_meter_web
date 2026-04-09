@@ -35,13 +35,6 @@ const ensureMetaTag = (name: string, attr: 'name' | 'property', content: string)
   tag.setAttribute('content', content);
 };
 
-const removeMetaTag = (name: string, attr: 'name' | 'property') => {
-  const tag = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${name}"]`);
-  if (tag) {
-    document.head.removeChild(tag);
-  }
-};
-
 export const MetaTags: React.FC<MetaTagsProps> = ({ config }) => {
   useEffect(() => {
     if (config.title) {

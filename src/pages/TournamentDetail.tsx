@@ -73,28 +73,8 @@ export default function TournamentDetail() {
     checkUserRegistration();
   }, [id, user]);
 
-  if (loading || !selectedTournament) {
-    return <Loading fullscreen message="Loading tournament details..." />;
-  }
-
-  // Helper function for consistent date formatting
-  const formatDate = (date: number | string) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const isRegistrationOpen = selectedTournament.status === 'draft';
-  const isTournamentFull =
-    typeof selectedTournament.maxTeams === 'number' &&
-    selectedTournament.maxTeams > 0 &&
-    entriesCount >= selectedTournament.maxTeams;
-  const dateRange = `${formatDate(selectedTournament.startDate)} 
-  – ${formatDate(selectedTournament.endDate)}`;
-
   const metaConfig = useMemo(() => {
+    if (!selectedTournament) return { title: 'Loading...' };
     const baseUrl = 'https://your-domain.com';
     const url = `${baseUrl}/tournaments/${selectedTournament.id}`;
     const title = `${selectedTournament.name} | MatchMeter`;
@@ -125,6 +105,7 @@ export default function TournamentDetail() {
   }, [selectedTournament]);
 
   const eventJsonLd = useMemo(() => {
+    if (!selectedTournament) return null;
     const startDateIso = new Date(selectedTournament.startDate).toISOString();
     const endDateIso = new Date(selectedTournament.endDate).toISOString();
     const baseUrl = 'https://your-domain.com';
@@ -166,6 +147,27 @@ export default function TournamentDetail() {
           : undefined,
     };
   }, [selectedTournament]);
+
+  if (loading || !selectedTournament) {
+    return <Loading fullscreen message="Loading tournament details..." />;
+  }
+
+  // Helper function for consistent date formatting
+  const formatDate = (date: number | string) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const isRegistrationOpen = selectedTournament.status === 'draft';
+  const isTournamentFull =
+    typeof selectedTournament.maxTeams === 'number' &&
+    selectedTournament.maxTeams > 0 &&
+    entriesCount >= selectedTournament.maxTeams;
+  const dateRange = `${formatDate(selectedTournament.startDate)} 
+  – ${formatDate(selectedTournament.endDate)}`;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
