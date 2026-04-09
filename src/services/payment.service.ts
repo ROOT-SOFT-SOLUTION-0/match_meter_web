@@ -12,7 +12,7 @@ interface RazorpayOptions {
   currency: string;
   name: string;
   description: string;
-  order_id: string;
+  order_id?: string;
   prefill: {
     email: string;
     contact: string;
@@ -79,7 +79,7 @@ class PaymentService {
         currency: 'INR',
         name: 'MATCHMETER',
         description: `Team Registration ${teamRegistrationId} - Tournament ${tournamentId}`,
-        order_id: orderId,
+        // order_id: orderId, // Removed to avoid "Invalid Order ID" error from Razorpay when using mock IDs
         prefill: { email, contact: phone },
         handler: (response: any) => {
           console.log('✓ Payment successful:', response);
@@ -135,7 +135,7 @@ class PaymentService {
         currency: 'INR',
         name: 'MATCHMETER',
         description: 'Tournament Creation Fee',
-        order_id: orderId,
+        // order_id: orderId, // Removed to avoid "Invalid Order ID" error from Razorpay
         prefill: { email, contact: phone },
         handler: (response: any) => {
           console.log('✓ Tournament creation payment successful:', response);
