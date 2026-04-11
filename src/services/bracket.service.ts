@@ -7,16 +7,32 @@ import {
   updateDoc,
   doc,
   getDoc,
+  limit,
+  onSnapshot,
+  orderBy,
   writeBatch,
   Timestamp,
+  Unsubscribe,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import {
   BracketMatch,
   BracketTeam,
+  MatchEvent,
+  MatchEventType,
   TournamentConfig,
   TournamentStats,
 } from '../types/models';
+
+export interface AddLiveEventInput {
+  type: MatchEventType;
+  minute: number;
+  teamSide?: 1 | 2;
+  playerName?: string;
+  secondaryPlayerName?: string;
+  penaltyOutcome?: 'scored' | 'missed';
+  note?: string;
+}
 
 export class BracketService {
   /**
@@ -275,6 +291,363 @@ export class BracketService {
     }
   }
 
+  static async getBracketMatch(matchId: string): Promise<BracketMatch | null> {
+    try {
+      const matchSnap = await getDoc(doc(db, 'bracket_matches', matchId));
+      if (!matchSnap.exists()) {
+        return null;
+      }
+
+      return {
+        id: matchSnap.id,
+        ...matchSnap.data(),
+      } as BracketMatch;
+    } catch (error) {
+      console.error('Error fetching bracket match:', error);
+      throw error;
+    }
+  }
+
+  static onBracketMatchChange(
+    matchId: string,
+    callback: (match: BracketMatch | null) => void
+  ): Unsubscribe {
+    return onSnapshot(doc(db, 'bracket_matches', matchId), (snapshot) => {
+      if (!snapshot.exists()) {
+        callback(null);
+        return;
+      }
+
+      callback({
+        id: snapshot.id,
+        ...snapshot.data(),
+      } as BracketMatch);
+    });
+  }
+
+  static async getMatchEvents(matchId: string, maxEvents = 200): Promise<MatchEvent[]> {
+    try {
+      const eventsQ = query(
+        collection(db, 'bracket_matches', matchId, 'events'),
+        orderBy('createdAt', 'desc'),
+        limit(maxEvents)
+      );
+
+      const snapshot = await getDocs(eventsQ);
+      return snapshot.docs.map((eventDoc) => ({
+        id: eventDoc.id,
+        ...eventDoc.data(),
+      })) as MatchEvent[];
+    } catch (error) {
+      console.error('Error fetching match events:', error);
+      throw error;
+    }
+  }
+
+  static onMatchEventsChange(
+    matchId: string,
+    callback: (events: MatchEvent[]) => void,
+    maxEvents = 200
+  ): Unsubscribe {
+    const eventsQ = query(
+      collection(db, 'bracket_matches', matchId, 'events'),
+      orderBy('createdAt', 'desc'),
+      limit(maxEvents)
+    );
+
+    return onSnapshot(eventsQ, (snapshot) => {
+      callback(
+        snapshot.docs.map((eventDoc) => ({
+          id: eventDoc.id,
+          ...eventDoc.data(),
+        })) as MatchEvent[]
+      );
+    });
+  }
+
+  static async startMatchLive(matchId: string, actorId?: string): Promise<void> {
+    const match = await this.requireMatch(matchId);
+    if (match.status === 'completed') {
+      throw new Error('Completed match cannot be restarted');
+    }
+
+    if (match.status !== 'pending' && match.status !== 'scheduled') {
+      throw new Error('Only pending or scheduled matches can be started');
+    }
+
+    const now = Timestamp.now().toMillis();
+    const minute = match.currentMinute ?? 0;
+
+    await this.appendMatchEvent(match, {
+      type: 'match_started',
+      minute,
+      note: 'Match started',
+      createdBy: actorId,
+    });
+
+    await updateDoc(doc(db, 'bracket_matches', matchId), {
+      status: 'live',
+      currentPhase: 'first_half',
+      currentMinute: minute,
+      actualStartTime: match.actualStartTime || now,
+      liveScore: this.getLiveScore(match),
+      lastEventAt: now,
+      lastEventType: 'match_started',
+      eventsCount: this.getEventsCount(match) + 1,
+      updatedAt: now,
+    });
+  }
+
+  static async setMatchOnBreak(
+    matchId: string,
+    minute: number,
+    note?: string,
+    actorId?: string
+  ): Promise<void> {
+    this.validateMinute(minute);
+    const match = await this.requireMatch(matchId);
+
+    if (match.status !== 'live') {
+      throw new Error('Only live matches can be moved to break');
+    }
+
+    const now = Timestamp.now().toMillis();
+
+    await this.appendMatchEvent(match, {
+      type: 'break',
+      minute,
+      note: note || 'Match break',
+      createdBy: actorId,
+    });
+
+    await updateDoc(doc(db, 'bracket_matches', matchId), {
+      status: 'break',
+      currentPhase: 'break',
+      currentMinute: minute,
+      lastEventAt: now,
+      lastEventType: 'break',
+      eventsCount: this.getEventsCount(match) + 1,
+      updatedAt: now,
+    });
+  }
+
+  static async resumeMatchLive(
+    matchId: string,
+    minute: number,
+    note?: string,
+    actorId?: string
+  ): Promise<void> {
+    this.validateMinute(minute);
+    const match = await this.requireMatch(matchId);
+
+    if (match.status !== 'break') {
+      throw new Error('Only break matches can be resumed');
+    }
+
+    const now = Timestamp.now().toMillis();
+
+    await this.appendMatchEvent(match, {
+      type: 'resume',
+      minute,
+      note: note || 'Match resumed',
+      createdBy: actorId,
+    });
+
+    await updateDoc(doc(db, 'bracket_matches', matchId), {
+      status: 'live',
+      currentPhase: 'second_half',
+      currentMinute: minute,
+      lastEventAt: now,
+      lastEventType: 'resume',
+      eventsCount: this.getEventsCount(match) + 1,
+      updatedAt: now,
+    });
+  }
+
+  static async stopMatchLive(
+    matchId: string,
+    minute: number,
+    note?: string,
+    actorId?: string
+  ): Promise<void> {
+    this.validateMinute(minute);
+    const match = await this.requireMatch(matchId);
+
+    if (match.status !== 'live' && match.status !== 'break') {
+      throw new Error('Only live or break matches can be stopped');
+    }
+
+    const now = Timestamp.now().toMillis();
+
+    await this.appendMatchEvent(match, {
+      type: 'match_stopped',
+      minute,
+      note: note || 'Match stopped',
+      createdBy: actorId,
+    });
+
+    await updateDoc(doc(db, 'bracket_matches', matchId), {
+      status: 'stopped',
+      currentPhase: 'stopped',
+      currentMinute: minute,
+      actualStopTime: now,
+      lastEventAt: now,
+      lastEventType: 'match_stopped',
+      eventsCount: this.getEventsCount(match) + 1,
+      updatedAt: now,
+    });
+  }
+
+  static async addLiveEvent(
+    matchId: string,
+    payload: AddLiveEventInput,
+    actorId?: string
+  ): Promise<void> {
+    this.validateMinute(payload.minute);
+    const match = await this.requireMatch(matchId);
+
+    if (match.status !== 'live') {
+      throw new Error('Live events can only be added while match is live');
+    }
+
+    const allowedTypes: MatchEventType[] = [
+      'goal',
+      'penalty',
+      'yellow_card',
+      'red_card',
+      'substitution',
+      'score_adjusted',
+    ];
+
+    if (!allowedTypes.includes(payload.type)) {
+      throw new Error('Unsupported event type for live event form');
+    }
+
+    if (
+      (payload.type === 'goal' ||
+        payload.type === 'penalty' ||
+        payload.type === 'yellow_card' ||
+        payload.type === 'red_card' ||
+        payload.type === 'substitution') &&
+      !payload.teamSide
+    ) {
+      throw new Error('Team is required for this event');
+    }
+
+    if (payload.type === 'penalty' && !payload.penaltyOutcome) {
+      throw new Error('Penalty outcome is required for penalty events');
+    }
+
+    const liveScore = this.getLiveScore(match);
+
+    if (payload.type === 'goal' && payload.teamSide) {
+      if (payload.teamSide === 1) {
+        liveScore.team1 += 1;
+      } else {
+        liveScore.team2 += 1;
+      }
+    }
+
+    if (
+      payload.type === 'penalty' &&
+      payload.penaltyOutcome === 'scored' &&
+      payload.teamSide
+    ) {
+      if (payload.teamSide === 1) {
+        liveScore.team1 += 1;
+      } else {
+        liveScore.team2 += 1;
+      }
+    }
+
+    const now = Timestamp.now().toMillis();
+
+    await this.appendMatchEvent(match, {
+      ...payload,
+      createdBy: actorId,
+    });
+
+    await updateDoc(doc(db, 'bracket_matches', matchId), {
+      liveScore,
+      currentMinute: payload.minute,
+      lastEventAt: now,
+      lastEventType: payload.type,
+      eventsCount: this.getEventsCount(match) + 1,
+      updatedAt: now,
+    });
+  }
+
+  static async updateLiveScore(
+    matchId: string,
+    team1Score: number,
+    team2Score: number,
+    minute: number,
+    actorId?: string
+  ): Promise<void> {
+    this.validateMinute(minute);
+
+    if (team1Score < 0 || team2Score < 0) {
+      throw new Error('Scores cannot be negative');
+    }
+
+    const match = await this.requireMatch(matchId);
+    if (match.status === 'completed') {
+      throw new Error('Cannot change score after completion');
+    }
+
+    const now = Timestamp.now().toMillis();
+
+    await this.appendMatchEvent(match, {
+      type: 'score_adjusted',
+      minute,
+      note: `Score adjusted to ${team1Score}-${team2Score}`,
+      createdBy: actorId,
+    });
+
+    await updateDoc(doc(db, 'bracket_matches', matchId), {
+      liveScore: {
+        team1: team1Score,
+        team2: team2Score,
+      },
+      currentMinute: minute,
+      lastEventAt: now,
+      lastEventType: 'score_adjusted',
+      eventsCount: this.getEventsCount(match) + 1,
+      updatedAt: now,
+    });
+  }
+
+  static async confirmFinalResult(matchId: string, tournamentId: string): Promise<void> {
+    const match = await this.requireMatch(matchId);
+    if (match.status !== 'stopped') {
+      throw new Error('Stop the match before confirming final result');
+    }
+
+    const liveScore = this.getLiveScore(match);
+
+    if (liveScore.team1 === liveScore.team2) {
+      throw new Error('Match cannot end in a draw');
+    }
+
+    await this.updateMatchResult(matchId, liveScore.team1, liveScore.team2, tournamentId);
+
+    const completedMatch = await this.requireMatch(matchId);
+    await this.appendMatchEvent(completedMatch, {
+      type: 'match_completed',
+      minute: completedMatch.currentMinute || 0,
+      note: `Final result confirmed: ${liveScore.team1}-${liveScore.team2}`,
+    });
+
+    const now = Timestamp.now().toMillis();
+    await updateDoc(doc(db, 'bracket_matches', matchId), {
+      currentPhase: 'completed',
+      eventsCount: this.getEventsCount(completedMatch) + 1,
+      lastEventAt: now,
+      lastEventType: 'match_completed',
+      updatedAt: now,
+    });
+  }
+
   /**
    * Update match result and advance winner
    */
@@ -312,6 +685,8 @@ export class BracketService {
         winnerId,
         winnerName,
         status: 'completed',
+        currentPhase: 'completed',
+        lastEventType: 'match_completed',
         updatedAt: Timestamp.now().toMillis(),
       });
 
@@ -572,5 +947,81 @@ export class BracketService {
       console.error('Error deleting bracket:', error);
       throw error;
     }
+  }
+
+  private static async requireMatch(matchId: string): Promise<BracketMatch> {
+    const match = await this.getBracketMatch(matchId);
+    if (!match) {
+      throw new Error('Match not found');
+    }
+
+    return match;
+  }
+
+  private static getLiveScore(match: BracketMatch): { team1: number; team2: number } {
+    if (match.liveScore) {
+      return {
+        team1: match.liveScore.team1 || 0,
+        team2: match.liveScore.team2 || 0,
+      };
+    }
+
+    if (match.result) {
+      return {
+        team1: match.result.team1Score || 0,
+        team2: match.result.team2Score || 0,
+      };
+    }
+
+    return { team1: 0, team2: 0 };
+  }
+
+  private static getEventsCount(match: BracketMatch): number {
+    return typeof match.eventsCount === 'number' ? match.eventsCount : 0;
+  }
+
+  private static validateMinute(minute: number): void {
+    if (!Number.isFinite(minute) || minute < 0 || minute > 300) {
+      throw new Error('Minute must be between 0 and 300');
+    }
+  }
+
+  private static async appendMatchEvent(
+    match: BracketMatch,
+    payload: Omit<MatchEvent, 'id' | 'tournamentId' | 'matchId' | 'createdAt'>
+  ): Promise<void> {
+    const eventData: Record<string, unknown> = {
+      tournamentId: match.tournamentId,
+      matchId: match.id,
+      type: payload.type,
+      minute: payload.minute,
+      createdAt: Timestamp.now().toMillis(),
+    };
+
+    if (payload.teamSide !== undefined) {
+      eventData.teamSide = payload.teamSide;
+    }
+
+    if (payload.playerName) {
+      eventData.playerName = payload.playerName;
+    }
+
+    if (payload.secondaryPlayerName) {
+      eventData.secondaryPlayerName = payload.secondaryPlayerName;
+    }
+
+    if (payload.penaltyOutcome) {
+      eventData.penaltyOutcome = payload.penaltyOutcome;
+    }
+
+    if (payload.note) {
+      eventData.note = payload.note;
+    }
+
+    if (payload.createdBy) {
+      eventData.createdBy = payload.createdBy;
+    }
+
+    await addDoc(collection(db, 'bracket_matches', match.id, 'events'), eventData);
   }
 }

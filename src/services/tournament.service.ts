@@ -28,6 +28,7 @@ export class TournamentService {
       description: string;
       sport: string;
       location: string;
+      googleMapsUrl?: string;
       maxTeams: number;
       entryFee: number;
       currency: string;

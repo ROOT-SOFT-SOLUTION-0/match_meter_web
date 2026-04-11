@@ -16,6 +16,7 @@ const SettingsPage = React.lazy(() => import('./pages/Settings'));
 const TournamentsPage = React.lazy(() => import('./pages/Tournaments'));
 const TournamentDetailPage = React.lazy(() => import('./pages/TournamentDetail'));
 const TournamentBracketPage = React.lazy(() => import('./pages/TournamentBracket'));
+const LiveMatchControlPage = React.lazy(() => import('./pages/LiveMatchControl'));
 const MyTeamsPage = React.lazy(() => import('./pages/MyTeams'));
 const ProfilePage = React.lazy(() => import('./pages/Profile'));
 const AdminPage = React.lazy(() => import('./pages/Admin'));
@@ -111,6 +112,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <TournamentBracketPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tournament/:id/bracket/:matchId/live"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <LiveMatchControlPage />
                 </ProtectedRoute>
               }
             />

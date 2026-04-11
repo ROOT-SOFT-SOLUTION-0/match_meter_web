@@ -62,6 +62,7 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
     description: '',
     sport: '',
     location: '',
+    googleMapsUrl: '',
     maxTeams: 16,
     maxPlayersPerTeam: 11,
     entryFee: 0,
@@ -104,6 +105,7 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
     const name = (nativeFormData.get('name') as string) || '';
     const sport = (nativeFormData.get('sport') as string) || '';
     const location = (nativeFormData.get('location') as string) || '';
+    const googleMapsUrl = (nativeFormData.get('googleMapsUrl') as string) || '';
     const registrationDeadlineStr =
       (nativeFormData.get('registrationDeadline') as string) || '';
     const startDateStr = (nativeFormData.get('startDate') as string) || '';
@@ -156,6 +158,7 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
       name,
       sport,
       location,
+      googleMapsUrl,
       startDate: startDateStr,
       endDate: endDateStr,
       registrationDeadline: registrationDeadlineStr,
@@ -184,6 +187,7 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
                 description: formData.description,
                 sport,
                 location,
+                googleMapsUrl,
                 maxTeams: formData.maxTeams,
                 entryFee: formData.entryFee,
                 currency: formData.currency,
@@ -275,6 +279,16 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
             required
           />
         </div>
+
+        {/* Google Maps URL */}
+        <InputField
+          label="Google Maps URL"
+          name="googleMapsUrl"
+          value={formData.googleMapsUrl}
+          onChange={handleInputChange}
+          placeholder="e.g., https://maps.app.goo.gl/... or https://www.google.com/maps/place/..."
+          helperText="Add a Google Maps link to help teams find the venue."
+        />
 
         {/* Max Teams & Players per Team & Entry Fee Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

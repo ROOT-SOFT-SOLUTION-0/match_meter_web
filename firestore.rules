@@ -193,6 +193,12 @@ service cloud.firestore {
       allow create: if isAdminOrSuperAdmin();
       allow update: if isAdminOrSuperAdmin();
       allow delete: if isSuperAdmin();
+
+      match /events/{eventId} {
+        allow read: if isSignedIn();
+        allow create, update: if isAdminOrSuperAdmin();
+        allow delete: if isSuperAdmin();
+      }
     }
 
     match /bracket_teams/{teamId} {

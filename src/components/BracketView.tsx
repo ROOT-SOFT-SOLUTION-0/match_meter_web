@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BracketService } from '../services/bracket.service';
 import {
   BracketMatch,
   BracketTeam,
+  MatchEventType,
   TeamRegistration,
   TournamentStats,
   User,
@@ -32,10 +34,25 @@ interface SelectedTeamDetails {
   players: TeamPlayerView[];
 }
 
+const EVENT_LABELS: Partial<Record<MatchEventType, string>> = {
+  match_started: 'Kickoff',
+  goal: 'Goal',
+  penalty: 'Penalty',
+  score_adjusted: 'Score update',
+  yellow_card: 'Yellow card',
+  red_card: 'Red card',
+  substitution: 'Substitution',
+  break: 'Break',
+  resume: 'Resume',
+  match_stopped: 'Stopped',
+  match_completed: 'Completed',
+};
+
 export const BracketView: React.FC<BracketViewProps> = ({
   tournamentId,
   isAdmin = false,
 }) => {
+  const navigate = useNavigate();
   const [bracket, setBracket] = useState<BracketMatch[]>([]);
   const [stats, setStats] = useState<TournamentStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -260,10 +277,50 @@ export const BracketView: React.FC<BracketViewProps> = ({
       }
 
       if (match.status === 'live') {
+        const liveScoreText = match.liveScore
+          ? ` (${match.liveScore.team1}-${match.liveScore.team2})`
+          : '';
+        const eventLabel = match.lastEventType ? EVENT_LABELS[match.lastEventType] : '';
+        const minuteLabel =
+          typeof match.currentMinute === 'number' ? `${match.currentMinute}'` : '';
+        const eventSuffix = [minuteLabel, eventLabel].filter(Boolean).join(' • ');
         nonSchedule.push({
           id: `${match.id}-live`,
           label: 'Live',
-          text: `${matchupText} is now live.`,
+          text: `${matchupText} is now live${liveScoreText}${
+            eventSuffix ? ` (${eventSuffix})` : ''
+          }.`,
+        });
+        return;
+      }
+
+      if (match.status === 'break') {
+        const eventLabel = match.lastEventType ? EVENT_LABELS[match.lastEventType] : '';
+        const minuteLabel =
+          typeof match.currentMinute === 'number' ? `${match.currentMinute}'` : '';
+        const eventSuffix = [minuteLabel, eventLabel].filter(Boolean).join(' • ');
+        nonSchedule.push({
+          id: `${match.id}-break`,
+          label: 'Break',
+          text: `${matchupText} is on break${eventSuffix ? ` (${eventSuffix})` : ''}.`,
+        });
+        return;
+      }
+
+      if (match.status === 'stopped') {
+        const stoppedScore = match.liveScore
+          ? ` (${match.liveScore.team1}-${match.liveScore.team2})`
+          : '';
+        const eventLabel = match.lastEventType ? EVENT_LABELS[match.lastEventType] : '';
+        const minuteLabel =
+          typeof match.currentMinute === 'number' ? `${match.currentMinute}'` : '';
+        const eventSuffix = [minuteLabel, eventLabel].filter(Boolean).join(' • ');
+        nonSchedule.push({
+          id: `${match.id}-stopped`,
+          label: 'Stopped',
+          text: `${matchupText} is stopped and awaiting final confirmation${stoppedScore}${
+            eventSuffix ? ` (${eventSuffix})` : ''
+          }.`,
         });
         return;
       }
@@ -390,18 +447,34 @@ export const BracketView: React.FC<BracketViewProps> = ({
 
                       const renderCard = (match: BracketMatch | undefined, index: number) => {
                         if (!match) return null;
+                        const isLiveLikeStatus =
+                          match.status === 'live' ||
+                          match.status === 'break' ||
+                          match.status === 'stopped';
+
+                        const liveTeam1Score = match.liveScore?.team1 ?? 0;
+                        const liveTeam2Score = match.liveScore?.team2 ?? 0;
+                        const latestEventLabel =
+                          match.lastEventType && EVENT_LABELS[match.lastEventType]
+                            ? EVENT_LABELS[match.lastEventType]
+                            : '';
+                        const latestMinuteLabel =
+                          typeof match.currentMinute === 'number'
+                            ? `${match.currentMinute}'`
+                            : '';
+
                         return (
                           <div
                             key={match.id}
                             className={`bracket-card p-3 md:p-4 rounded-xl border border-white/15 bg-white/5 backdrop-blur-sm transition bracket-node-enter ${
-                              selectedMatch?.id === match.id
-                                ? 'border-yellow-400 bg-yellow-400/10 shadow-lg'
+                              isLiveLikeStatus
+                                ? 'border-red-300/70 bg-red-400/10'
                                 : 'hover:border-white/40 hover:bg-white/10'
                             } ${isAdmin ? 'cursor-pointer' : 'cursor-default'}`}
                             style={{ animationDelay: `${index * 80}ms` }}
                             onClick={() => {
                               if (isAdmin) {
-                                setSelectedMatch(match);
+                                navigate(`/tournament/${tournamentId}/bracket/${match.id}/live`);
                               }
                             }}
                           >
@@ -434,6 +507,10 @@ export const BracketView: React.FC<BracketViewProps> = ({
                               {match.status === 'completed' ? (
                                 <div className="px-2 md:px-3 text-center text-xs md:text-sm font-bold">
                                   {match.result?.team1Score} - {match.result?.team2Score}
+                                </div>
+                              ) : isLiveLikeStatus ? (
+                                <div className="px-2 md:px-3 text-center text-xs md:text-sm font-bold text-red-200">
+                                  {liveTeam1Score} - {liveTeam2Score}
                                 </div>
                               ) : (
                                 <div className="px-2 md:px-3 text-center text-[10px] md:text-xs uppercase tracking-wide text-white/60">
@@ -470,6 +547,27 @@ export const BracketView: React.FC<BracketViewProps> = ({
                             {match.winnerId && (
                               <div className="mt-2 text-center text-[11px] md:text-xs font-semibold text-yellow-300">
                                 ✓ {match.winnerName} wins
+                              </div>
+                            )}
+
+                            {(isLiveLikeStatus || latestEventLabel) && (
+                              <div className="mt-2 flex items-center justify-between text-[10px] md:text-[11px] text-white/80">
+                                <span
+                                  className={`inline-flex rounded-full px-2 py-0.5 font-semibold uppercase tracking-wide ${
+                                    match.status === 'live'
+                                      ? 'bg-red-500/20 text-red-100'
+                                      : match.status === 'break'
+                                      ? 'bg-amber-500/20 text-amber-100'
+                                      : match.status === 'stopped'
+                                      ? 'bg-purple-500/20 text-purple-100'
+                                      : 'bg-white/10 text-white/90'
+                                  }`}
+                                >
+                                  {match.status}
+                                </span>
+                                <span className="font-medium">
+                                  {[latestMinuteLabel, latestEventLabel].filter(Boolean).join(' • ')}
+                                </span>
                               </div>
                             )}
                           </div>

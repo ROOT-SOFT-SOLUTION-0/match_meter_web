@@ -286,6 +286,10 @@ export const AdminTournamentWorkflow: React.FC = () => {
     }
   };
 
+  const handleOpenLiveControl = (matchId: string) => {
+    navigate(`/tournament/${tournamentId}/bracket/${matchId}/live`);
+  };
+
   if (loading && !tournament) return <Loading />;
 
   return (
@@ -605,17 +609,31 @@ export const AdminTournamentWorkflow: React.FC = () => {
                         key={match.id}
                         className="p-3 bg-gray-50 rounded-lg border"
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="font-semibold">
-                              {match.team1Name || ''}
-                            </p>
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold truncate">
+                                  {match.team1Name || 'TBD'}
+                                </p>
+                              </div>
+                              <div className="px-4 text-center font-bold">vs</div>
+                              <div className="flex-1 min-w-0 text-right">
+                                <p className="font-semibold truncate">
+                                  {match.team2Name || 'TBD'}
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                          <div className="px-4 text-center font-bold">vs</div>
-                          <div className="flex-1 text-right">
-                            <p className="font-semibold">
-                              {match.team2Name || ''}
-                            </p>
+                          <div className="shrink-0">
+                            <Button
+                              size="sm"
+                              onClick={() => handleOpenLiveControl(match.id)}
+                              disabled={!match.team1Id || !match.team2Id}
+                              className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                              Go Live
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -674,24 +692,39 @@ export const AdminTournamentWorkflow: React.FC = () => {
                             : 'bg-yellow-50 border-yellow-300'
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="font-semibold">
-                              {match.team1Name || 'TBD'}
-                            </p>
-                          </div>
-                          {match.status === 'completed' ? (
-                            <div className="px-4 text-center font-bold">
-                              {match.result?.team1Score} -{' '}
-                              {match.result?.team2Score}
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold truncate">
+                                  {match.team1Name || 'TBD'}
+                                </p>
+                              </div>
+                              {match.status === 'completed' ? (
+                                <div className="px-4 text-center font-bold">
+                                  {match.result?.team1Score} -{' '}
+                                  {match.result?.team2Score}
+                                </div>
+                              ) : (
+                                <div className="px-4 text-center">vs</div>
+                              )}
+                              <div className="flex-1 min-w-0 text-right">
+                                <p className="font-semibold truncate">
+                                  {match.team2Name || 'TBD'}
+                                </p>
+                              </div>
                             </div>
-                          ) : (
-                            <div className="px-4 text-center">vs</div>
-                          )}
-                          <div className="flex-1 text-right">
-                            <p className="font-semibold">
-                              {match.team2Name || 'TBD'}
-                            </p>
+                          </div>
+
+                          <div className="shrink-0">
+                            <Button
+                              size="sm"
+                              onClick={() => handleOpenLiveControl(match.id)}
+                              disabled={!match.team1Id || !match.team2Id}
+                              className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                              Go Live
+                            </Button>
                           </div>
                         </div>
                         {match.status === 'completed' && (

@@ -29,6 +29,7 @@ export interface Tournament {
   startDate: number;
   endDate: number;
   location: string;
+  googleMapsUrl?: string;
   totalTeams: number;
   maxTeams: number;
   maxPlayersPerTeam?: number;
@@ -161,6 +162,43 @@ export interface TournamentConfig {
   updatedAt: number;
 }
 
+export type MatchEventType =
+  | 'match_started'
+  | 'goal'
+  | 'penalty'
+  | 'score_adjusted'
+  | 'yellow_card'
+  | 'red_card'
+  | 'substitution'
+  | 'break'
+  | 'resume'
+  | 'match_stopped'
+  | 'match_completed';
+
+export type MatchPhase =
+  | 'pre_match'
+  | 'first_half'
+  | 'break'
+  | 'second_half'
+  | 'extra_time'
+  | 'stopped'
+  | 'completed';
+
+export interface MatchEvent {
+  id: string;
+  tournamentId: string;
+  matchId: string;
+  type: MatchEventType;
+  minute: number;
+  teamSide?: 1 | 2;
+  playerName?: string;
+  secondaryPlayerName?: string;
+  penaltyOutcome?: 'scored' | 'missed';
+  note?: string;
+  createdBy?: string;
+  createdAt: number;
+}
+
 export interface BracketMatch {
   id: string;
   tournamentId: string;
@@ -179,7 +217,25 @@ export interface BracketMatch {
     team2Score: number;
     winnerByScore: boolean;
   };
-  status: 'pending' | 'scheduled' | 'live' | 'completed' | 'bye';
+  status:
+    | 'pending'
+    | 'scheduled'
+    | 'live'
+    | 'break'
+    | 'stopped'
+    | 'completed'
+    | 'bye';
+  liveScore?: {
+    team1: number;
+    team2: number;
+  };
+  actualStartTime?: number;
+  actualStopTime?: number;
+  currentMinute?: number;
+  currentPhase?: MatchPhase;
+  lastEventAt?: number;
+  lastEventType?: MatchEventType;
+  eventsCount?: number;
   matchNumber: number;
   bracketType: 'winners' | 'losers';
   nextMatchId?: string;
