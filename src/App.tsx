@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Layout, ProtectedRoute } from './components/layout';
 import { ToastContainer } from './components';
@@ -34,7 +34,17 @@ const AdminTournamentWorkflowPage = React.lazy(
 const NotFoundPage = React.lazy(() => import('./pages/NotFound'));
 
 function App() {
-  const { isServiceWorkerReady } = usePWA();
+  const { isServiceWorkerReady, isInstallable, isInstalled, install } = usePWA();
+  const [installing, setInstalling] = useState(false);
+
+  const handleInstallClick = async () => {
+    try {
+      setInstalling(true);
+      await install();
+    } finally {
+      setInstalling(false);
+    }
+  };
 
   // Initialize services
   useEffect(() => {
@@ -226,6 +236,19 @@ function App() {
         <div className="fixed bottom-4 left-4 text-xs bg-green-500 text-white px-3 py-2 rounded-full">
           ✓ App is ready offline
         </div>
+      )}
+
+      {/* PWA Install Button */}
+      {isInstallable && !isInstalled && (
+        <button
+          onClick={handleInstallClick}
+          disabled={installing}
+          className="fixed right-4 bottom-20 md:bottom-4 z-50 inline-flex items-center justify-center rounded-full bg-primary-600 hover:bg-primary-500 disabled:opacity-70 disabled:cursor-not-allowed text-white px-4 py-2 text-sm font-semibold shadow-soft"
+          aria-label="Install app"
+          title="Install app"
+        >
+          {installing ? 'Installing...' : 'Install App'}
+        </button>
       )}
     </Router>
   );
