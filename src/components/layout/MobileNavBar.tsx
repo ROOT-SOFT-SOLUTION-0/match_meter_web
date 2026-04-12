@@ -43,11 +43,11 @@ const items: NavItem[] = [
   },
 ];
 
-export const MobileNavBar = () => {
+export const MobileNavBar = ({ hidden = false }: { hidden?: boolean }) => {
   const { user } = useAuth();
   const location = useLocation();
 
-  if (!user) return null;
+  if (!user || hidden) return null;
 
   const visible = items.filter((i) => i.roles.includes(user.role));
 

@@ -53,7 +53,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           {children}
         </div>
       </main>
-      {user && <MobileNavBar />}
+      {user && <MobileNavBar hidden={isSidebarOpen} />}
     </div>
   );
 };
