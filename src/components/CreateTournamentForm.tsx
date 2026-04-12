@@ -9,6 +9,14 @@ import { ImageUploader } from './ImageUploader';
 import { useAuth } from '../hooks';
 import toast from 'react-hot-toast';
 
+const getLocalDateInputValue = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 interface CreateTournamentFormProps {
   onSuccess?: (tournamentId: string) => void;
   onClose?: () => void;
@@ -40,6 +48,7 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [tournamentFee, setTournamentFee] = useState<number>(199);
+  const todayDate = getLocalDateInputValue();
 
   // Load current tournament creation fee from global pricing config
   useEffect(() => {
@@ -82,6 +91,51 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
     >
   ) => {
     const { name, value } = e.target;
+
+    if (
+      name === 'registrationDeadline' ||
+      name === 'startDate' ||
+      name === 'endDate'
+    ) {
+      setFormData((prev) => {
+        const today = getLocalDateInputValue();
+        const next = {
+          ...prev,
+          [name]: value,
+        };
+
+        // Keep all date fields on or after today.
+        if (next.registrationDeadline && next.registrationDeadline < today) {
+          next.registrationDeadline = today;
+        }
+
+        if (next.startDate && next.startDate < today) {
+          next.startDate = today;
+        }
+
+        if (next.endDate && next.endDate < today) {
+          next.endDate = today;
+        }
+
+        // Registration deadline cannot be after start date.
+        if (
+          next.startDate &&
+          next.registrationDeadline &&
+          next.registrationDeadline > next.startDate
+        ) {
+          next.registrationDeadline = next.startDate;
+        }
+
+        // End date cannot be before start date.
+        if (next.startDate && next.endDate && next.endDate < next.startDate) {
+          next.endDate = next.startDate;
+        }
+
+        return next;
+      });
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       [name]:
@@ -126,6 +180,16 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
     const startTime = new Date(startDateStr).getTime();
     const endTime = new Date(endDateStr).getTime();
     const regDeadline = new Date(registrationDeadlineStr).getTime();
+    const todayStart = new Date(`${todayDate}T00:00:00`).getTime();
+
+    if (
+      regDeadline < todayStart ||
+      startTime < todayStart ||
+      endTime < todayStart
+    ) {
+      toast.error('Please select today or a future date');
+      return;
+    }
 
     if (formData.maxTeams < 2 || formData.maxTeams > 128) {
       toast.error('Max teams must be between 2 and 128');
@@ -351,6 +415,9 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
             type="date"
             value={formData.registrationDeadline}
             onChange={handleInputChange}
+            min={todayDate}
+            max={formData.startDate || undefined}
+            helperText="Choose today or a future date. Must be on or before start date."
             required
           />
 
@@ -360,6 +427,12 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
             type="date"
             value={formData.startDate}
             onChange={handleInputChange}
+            min={
+              formData.registrationDeadline && formData.registrationDeadline > todayDate
+                ? formData.registrationDeadline
+                : todayDate
+            }
+            helperText="Start date must be today/future and not before registration deadline."
             required
           />
 
@@ -369,6 +442,12 @@ export const CreateTournamentForm: React.FC<CreateTournamentFormProps> = ({
             type="date"
             value={formData.endDate}
             onChange={handleInputChange}
+            min={
+              formData.startDate && formData.startDate > todayDate
+                ? formData.startDate
+                : todayDate
+            }
+            helperText="End date must be on or after start date."
             required
           />
         </div>
