@@ -34,10 +34,16 @@ const AdminTournamentWorkflowPage = React.lazy(
 const NotFoundPage = React.lazy(() => import('./pages/NotFound'));
 
 function App() {
-  const { isServiceWorkerReady, isInstallable, isInstalled, install } = usePWA();
+  const { isInstallable, isInstalled, isIOS, showManualInstall, install } = usePWA();
   const [installing, setInstalling] = useState(false);
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
 
   const handleInstallClick = async () => {
+    if (!isInstallable) {
+      setShowInstallHelp(true);
+      return;
+    }
+
     try {
       setInstalling(true);
       await install();
@@ -45,6 +51,8 @@ function App() {
       setInstalling(false);
     }
   };
+
+  const shouldShowInstallCTA = !isInstalled && (isInstallable || showManualInstall);
 
   // Initialize services
   useEffect(() => {
@@ -231,24 +239,66 @@ function App() {
       {/* Global Toast Container */}
       <ToastContainer />
 
-      {/* Service Worker Ready Indicator */}
-      {isServiceWorkerReady && (
-        <div className="fixed bottom-4 left-4 text-xs bg-green-500 text-white px-3 py-2 rounded-full">
-          ✓ App is ready offline
-        </div>
-      )}
-
       {/* PWA Install Button */}
-      {isInstallable && !isInstalled && (
+      {shouldShowInstallCTA && (
         <button
           onClick={handleInstallClick}
-          disabled={installing}
+          disabled={installing && isInstallable}
           className="fixed right-4 bottom-20 md:bottom-4 z-50 inline-flex items-center justify-center rounded-full bg-primary-600 hover:bg-primary-500 disabled:opacity-70 disabled:cursor-not-allowed text-white px-4 py-2 text-sm font-semibold shadow-soft"
           aria-label="Install app"
           title="Install app"
         >
-          {installing ? 'Installing...' : 'Install App'}
+          {installing ? 'Installing...' : isInstallable ? 'Install App' : 'Add to Home Screen'}
         </button>
+      )}
+
+      {/* Manual install guide for mobile browsers without native prompt */}
+      {showInstallHelp && shouldShowInstallCTA && (
+        <div className="fixed inset-0 z-[60] bg-black/50 p-4 flex items-end sm:items-center sm:justify-center">
+          <div className="w-full sm:max-w-md rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-secondary-900 p-5 shadow-xl">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+              Install MATCHMETER
+            </h3>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+              Follow these steps to add the app to your home screen.
+            </p>
+
+            <ol className="mt-3 list-decimal pl-5 space-y-1.5 text-sm text-gray-700 dark:text-gray-200">
+              {isIOS ? (
+                <>
+                  <li>Tap the Share button in Safari.</li>
+                  <li>Select Add to Home Screen.</li>
+                  <li>Tap Add to finish installation.</li>
+                </>
+              ) : (
+                <>
+                  <li>Tap the browser menu (three dots).</li>
+                  <li>Select Install app or Add to Home screen.</li>
+                  <li>Confirm Install.</li>
+                </>
+              )}
+            </ol>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowInstallHelp(false)}
+                className="rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200"
+              >
+                Close
+              </button>
+              {isInstallable && (
+                <button
+                  type="button"
+                  onClick={handleInstallClick}
+                  className="rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-medium text-white"
+                >
+                  Try Install
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </Router>
   );

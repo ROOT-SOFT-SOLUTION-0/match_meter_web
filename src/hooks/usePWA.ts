@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react';
 
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+};
+
 interface UsePWAReturn {
   isInstallable: boolean;
   isInstalled: boolean;
-  installPrompt: any;
+  isIOS: boolean;
+  showManualInstall: boolean;
+  installPrompt: BeforeInstallPromptEvent | null;
   install: () => Promise<void>;
   openInFullscreen: () => Promise<void>;
   isServiceWorkerReady: boolean;
@@ -11,22 +18,32 @@ interface UsePWAReturn {
 }
 
 export function usePWA(): UsePWAReturn {
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [showManualInstall, setShowManualInstall] = useState(false);
   const [isServiceWorkerReady, setIsServiceWorkerReady] = useState(false);
 
   useEffect(() => {
-    // Check if PWA is already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsInstalled(true);
-    }
+    const ua = window.navigator.userAgent.toLowerCase();
+    const iosDevice = /iphone|ipad|ipod/.test(ua);
+    const androidDevice = /android/.test(ua);
+    const mobileDevice = iosDevice || androidDevice;
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      Boolean((window.navigator as Navigator & { standalone?: boolean }).standalone);
+
+    setIsIOS(iosDevice);
+    setIsInstalled(isStandalone);
+    setShowManualInstall(mobileDevice && !isStandalone);
 
     // Listen for install prompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setInstallPrompt(e);
+      setInstallPrompt(e as BeforeInstallPromptEvent);
       setIsInstallable(true);
+      setShowManualInstall(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -37,6 +54,7 @@ export function usePWA(): UsePWAReturn {
       setIsInstalled(true);
       setInstallPrompt(null);
       setIsInstallable(false);
+      setShowManualInstall(false);
     };
 
     window.addEventListener('appinstalled', handleAppInstalled);
@@ -78,7 +96,8 @@ export function usePWA(): UsePWAReturn {
 
   const install = async () => {
     if (!installPrompt) {
-      console.warn('Install prompt not available');
+      console.warn('Install prompt not available, use browser menu to install');
+      setShowManualInstall(true);
       return;
     }
 
@@ -89,12 +108,16 @@ export function usePWA(): UsePWAReturn {
 
       if (outcome === 'accepted') {
         setIsInstalled(true);
+        setShowManualInstall(false);
+      } else {
+        setShowManualInstall(true);
       }
 
       setInstallPrompt(null);
       setIsInstallable(false);
     } catch (error) {
       console.error('Installation failed:', error);
+      setShowManualInstall(true);
     }
   };
 
@@ -129,6 +152,8 @@ export function usePWA(): UsePWAReturn {
   return {
     isInstallable,
     isInstalled,
+    isIOS,
+    showManualInstall,
     installPrompt,
     install,
     openInFullscreen,
