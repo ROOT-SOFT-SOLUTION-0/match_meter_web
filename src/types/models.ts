@@ -216,6 +216,16 @@ export interface BracketMatch {
     team1Score: number;
     team2Score: number;
     winnerByScore: boolean;
+    team1Scorers?: Array<{
+      playerId?: string;
+      playerName: string;
+      goals: number;
+    }>;
+    team2Scorers?: Array<{
+      playerId?: string;
+      playerName: string;
+      goals: number;
+    }>;
   };
   status:
     | 'pending'

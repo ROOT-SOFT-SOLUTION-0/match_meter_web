@@ -655,7 +655,11 @@ export class BracketService {
     matchId: string,
     team1Score: number,
     team2Score: number,
-    tournamentId: string
+    tournamentId: string,
+    options?: {
+      team1Scorers?: Array<{ playerId?: string; playerName: string; goals: number }>;
+      team2Scorers?: Array<{ playerId?: string; playerName: string; goals: number }>;
+    }
   ): Promise<void> {
     try {
       const matchRef = doc(db, 'bracket_matches', matchId);
@@ -675,13 +679,24 @@ export class BracketService {
         throw new Error('Invalid match participants');
       }
 
+      // Build result payload including optional scorer breakdowns
+      const resultPayload: any = {
+        team1Score,
+        team2Score,
+        winnerByScore: true,
+      };
+
+      if (options?.team1Scorers && options.team1Scorers.length > 0) {
+        resultPayload.team1Scorers = options.team1Scorers;
+      }
+
+      if (options?.team2Scorers && options.team2Scorers.length > 0) {
+        resultPayload.team2Scorers = options.team2Scorers;
+      }
+
       // Update current match
       await updateDoc(matchRef, {
-        result: {
-          team1Score,
-          team2Score,
-          winnerByScore: true,
-        },
+        result: resultPayload,
         winnerId,
         winnerName,
         status: 'completed',

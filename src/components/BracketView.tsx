@@ -67,6 +67,18 @@ export const BracketView: React.FC<BracketViewProps> = ({
     team1Score: 0,
     team2Score: 0,
   });
+  const [team1Scorers, setTeam1Scorers] = useState<
+    Array<{ playerId?: string; playerName: string; goals: number }>
+  >([]);
+  const [team2Scorers, setTeam2Scorers] = useState<
+    Array<{ playerId?: string; playerName: string; goals: number }>
+  >([]);
+  const [scorerDraft, setScorerDraft] = useState({
+    team1PlayerKey: '',
+    team1Goals: 1,
+    team2PlayerKey: '',
+    team2Goals: 1,
+  });
   const [bracketDims, setBracketDims] = useState({ width: 0, height: 0 });
   const bracketContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -146,6 +158,50 @@ export const BracketView: React.FC<BracketViewProps> = ({
     }
   };
 
+  // When a match is selected for result entry, prefill scores and any existing scorers
+  useEffect(() => {
+    if (!selectedMatch) {
+      setResultForm({ team1Score: 0, team2Score: 0 });
+      setTeam1Scorers([]);
+      setTeam2Scorers([]);
+      setScorerDraft({
+        team1PlayerKey: '',
+        team1Goals: 1,
+        team2PlayerKey: '',
+        team2Goals: 1,
+      });
+      return;
+    }
+
+    setResultForm({
+      team1Score: selectedMatch.result?.team1Score ?? 0,
+      team2Score: selectedMatch.result?.team2Score ?? 0,
+    });
+
+    setTeam1Scorers(
+      selectedMatch.result?.team1Scorers?.map((entry) => ({
+        playerId: entry.playerId,
+        playerName: entry.playerName,
+        goals: entry.goals,
+      })) || []
+    );
+
+    setTeam2Scorers(
+      selectedMatch.result?.team2Scorers?.map((entry) => ({
+        playerId: entry.playerId,
+        playerName: entry.playerName,
+        goals: entry.goals,
+      })) || []
+    );
+
+    setScorerDraft({
+      team1PlayerKey: '',
+      team1Goals: 1,
+      team2PlayerKey: '',
+      team2Goals: 1,
+    });
+  }, [selectedMatch]);
+
   const handleSubmitResult = async () => {
     if (!selectedMatch) return;
 
@@ -157,12 +213,29 @@ export const BracketView: React.FC<BracketViewProps> = ({
       return;
     }
 
+    const totalTeam1Goals = team1Scorers.reduce((sum, s) => sum + s.goals, 0);
+    const totalTeam2Goals = team2Scorers.reduce((sum, s) => sum + s.goals, 0);
+
+    if (team1Scorers.length > 0 && totalTeam1Goals !== resultForm.team1Score) {
+      toast.error('Team 1 goal breakdown must equal the team score');
+      return;
+    }
+
+    if (team2Scorers.length > 0 && totalTeam2Goals !== resultForm.team2Score) {
+      toast.error('Team 2 goal breakdown must equal the team score');
+      return;
+    }
+
     try {
       await BracketService.updateMatchResult(
         selectedMatch.id,
         resultForm.team1Score,
         resultForm.team2Score,
-        tournamentId
+        tournamentId,
+        {
+          team1Scorers,
+          team2Scorers,
+        }
       );
 
       toast.success('Match result updated!');
@@ -239,6 +312,26 @@ export const BracketView: React.FC<BracketViewProps> = ({
     });
   };
 
+  const getTeamPlayers = (teamId?: string): TeamPlayerView[] => {
+    if (!teamId) return [];
+    const team = bracketTeams.find((entry) => entry.id === teamId);
+    if (!team) return [];
+    const registration = registrationsById[team.registrationId];
+    if (!registration) return [];
+
+    if (registration.playersInfo?.length) {
+      return registration.playersInfo.map((player) => ({
+        name: player.name,
+        phone: player.phone,
+        userId: player.userId,
+      }));
+    }
+
+    return (registration.players || []).map((playerName) => ({
+      name: playerName,
+    }));
+  };
+
   const officialUpdates = useMemo(() => {
     const hasRealName = (name?: string) => {
       const normalized = (name || '').trim().toLowerCase();
@@ -264,9 +357,28 @@ export const BracketView: React.FC<BracketViewProps> = ({
         const winnerKnown = hasRealName(match.winnerName);
         const loserKnown = hasRealName(loserName);
 
-        const resultText = winnerKnown && loserKnown
+        let resultText = winnerKnown && loserKnown
           ? `${match.winnerName} defeated ${loserName}${score ? ` (${score})` : ''}.`
           : `${matchupText} result recorded${score ? ` (${score})` : ''}.`;
+
+        const team1ScorersText = match.result?.team1Scorers?.length
+          ? match.result.team1Scorers
+              .map((s) => `${s.playerName} x${s.goals}`)
+              .join(', ')
+          : '';
+        const team2ScorersText = match.result?.team2Scorers?.length
+          ? match.result.team2Scorers
+              .map((s) => `${s.playerName} x${s.goals}`)
+              .join(', ')
+          : '';
+
+        const combinedScorersText = [team1ScorersText, team2ScorersText]
+          .filter(Boolean)
+          .join(' | ');
+
+        if (combinedScorersText) {
+          resultText += ` Scorers: ${combinedScorersText}.`;
+        }
 
         nonSchedule.push({
           id: `${match.id}-completed`,
@@ -750,6 +862,161 @@ export const BracketView: React.FC<BracketViewProps> = ({
                       className="w-20 rounded-xl border border-slate-300 px-3 py-1.5 text-center text-sm font-semibold text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Goal Scorers (Football-style breakdown) */}
+              <div className="mb-4 rounded-2xl bg-white/80 p-4 shadow-sm space-y-4">
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                  Goal Scorers (optional)
+                </p>
+
+                {/* Team 1 scorers */}
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase">
+                    {selectedMatch.team1Name} scorers
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <select
+                      className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      value={scorerDraft.team1PlayerKey}
+                      onChange={(e) =>
+                        setScorerDraft((prev) => ({
+                          ...prev,
+                          team1PlayerKey: e.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">Select player</option>
+                      {getTeamPlayers(selectedMatch.team1Id).map((player) => {
+                        const key = player.userId || player.name;
+                        return (
+                          <option key={key} value={key}>
+                            {player.name}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <input
+                      type="number"
+                      min="1"
+                      className="w-16 rounded-xl border border-slate-300 px-2 py-1.5 text-center text-xs font-semibold text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      value={scorerDraft.team1Goals}
+                      onChange={(e) =>
+                        setScorerDraft((prev) => ({
+                          ...prev,
+                          team1Goals: Math.max(1, parseInt(e.target.value) || 1),
+                        }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="rounded-full bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-slate-700"
+                      onClick={() => {
+                        const players = getTeamPlayers(selectedMatch.team1Id);
+                        const player = players.find((p) =>
+                          (p.userId || p.name) === scorerDraft.team1PlayerKey
+                        );
+                        if (!player) return;
+                        setTeam1Scorers((prev) => [
+                          ...prev,
+                          {
+                            playerId: player.userId,
+                            playerName: player.name,
+                            goals: scorerDraft.team1Goals,
+                          },
+                        ]);
+                        setScorerDraft((prev) => ({
+                          ...prev,
+                          team1PlayerKey: '',
+                          team1Goals: 1,
+                        }));
+                      }}
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {team1Scorers.length > 0 && (
+                    <p className="text-[11px] text-slate-600">
+                      {team1Scorers
+                        .map((s) => `${s.playerName} x${s.goals}`)
+                        .join(', ')}
+                    </p>
+                  )}
+                </div>
+
+                {/* Team 2 scorers */}
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase">
+                    {selectedMatch.team2Name} scorers
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <select
+                      className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      value={scorerDraft.team2PlayerKey}
+                      onChange={(e) =>
+                        setScorerDraft((prev) => ({
+                          ...prev,
+                          team2PlayerKey: e.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">Select player</option>
+                      {getTeamPlayers(selectedMatch.team2Id).map((player) => {
+                        const key = player.userId || player.name;
+                        return (
+                          <option key={key} value={key}>
+                            {player.name}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    <input
+                      type="number"
+                      min="1"
+                      className="w-16 rounded-xl border border-slate-300 px-2 py-1.5 text-center text-xs font-semibold text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                      value={scorerDraft.team2Goals}
+                      onChange={(e) =>
+                        setScorerDraft((prev) => ({
+                          ...prev,
+                          team2Goals: Math.max(1, parseInt(e.target.value) || 1),
+                        }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="rounded-full bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-slate-700"
+                      onClick={() => {
+                        const players = getTeamPlayers(selectedMatch.team2Id);
+                        const player = players.find((p) =>
+                          (p.userId || p.name) === scorerDraft.team2PlayerKey
+                        );
+                        if (!player) return;
+                        setTeam2Scorers((prev) => [
+                          ...prev,
+                          {
+                            playerId: player.userId,
+                            playerName: player.name,
+                            goals: scorerDraft.team2Goals,
+                          },
+                        ]);
+                        setScorerDraft((prev) => ({
+                          ...prev,
+                          team2PlayerKey: '',
+                          team2Goals: 1,
+                        }));
+                      }}
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {team2Scorers.length > 0 && (
+                    <p className="text-[11px] text-slate-600">
+                      {team2Scorers
+                        .map((s) => `${s.playerName} x${s.goals}`)
+                        .join(', ')}
+                    </p>
+                  )}
                 </div>
               </div>
 
