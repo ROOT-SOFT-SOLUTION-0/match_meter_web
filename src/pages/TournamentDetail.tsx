@@ -343,10 +343,10 @@ export default function TournamentDetail() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-500 dark:text-gray-400 block mb-1">Prize Pool</label>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400 block mb-1">Entry Fee</label>
                 <p className="text-2xl font-extrabold text-primary-600 dark:text-primary-400">
-                  {selectedTournament.prizePool
-                    ? `₹${selectedTournament.prizePool.toLocaleString()}`
+                  {selectedTournament.entryFee
+                    ? `₹${selectedTournament.entryFee.toLocaleString()}`
                     : 'To be announced'}
                 </p>
               </div>
